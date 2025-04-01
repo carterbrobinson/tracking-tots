@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
@@ -10,8 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# print(os.environ.get("OPENAI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
@@ -68,7 +66,7 @@ class Todo(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     time = db.Column(db.DateTime, nullable=False)
     notes = db.Column(db.Text, nullable=True)
-
+    completed = db.Column(db.Boolean, default=False, nullable=False)
 
 class Reminder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -76,6 +74,7 @@ class Reminder(db.Model):
     category = db.Column(db.String(50), nullable=False)
     reminder_time = db.Column(db.DateTime, nullable=False)
     notified = db.Column(db.Boolean, default=False)
+
 # API Endpoints
 
 @app.route('/register', methods=['POST'])
@@ -168,8 +167,8 @@ def get_diaper_change_data(user_id):
         "notes": d.notes
     } for d in diaper_change_data])
 
-@app.route('/diaper-change', methods=['POST'])
-def add_diaper_change():
+@app.route('/diaper-change/<int:user_id>', methods=['POST'])
+def add_diaper_change(user_id):
     data = request.json
     new_diaper_change = DiaperChange(
         user_id=data['user_id'],
@@ -181,8 +180,8 @@ def add_diaper_change():
     db.session.commit()
     return jsonify({"message": "Diaper change record added!"}), 201
 
-@app.route('/todo', methods=['POST'])
-def add_task():
+@app.route('/todo/<int:user_id>', methods=['POST'])
+def add_task(user_id):
     data = request.json
     new_task = Todo(
         user_id=data['user_id'],
@@ -199,18 +198,34 @@ def get_todo_list(user_id):
     return jsonify([{
         "id": t.id,
         "time": t.time.isoformat(),
-        "notes": t.notes
+        "notes": t.notes,
+        "completed": t.completed
     } for t in todos])
 
-@app.route('/todo/<int:todo_id>', methods=['DELETE'])
-def remove_task(todo_id):
-    todo = Todo.query.filter_by(id=todo_id).first()
+@app.route('/todo/<int:user_id>', methods=['DELETE'])
+def remove_task(user_id):
+    todo = Todo.query.filter_by(id=user_id).first()
     if not todo:
         return jsonify({"message": "Todo not found"}), 404
     
     db.session.delete(todo)
     db.session.commit()
     return jsonify({"message": "Todo deleted successfully"}), 200
+
+@app.route('/todo/<int:todo_id>/toggle', methods=['PATCH'])
+def toggle_todo(todo_id):
+    try:
+        todo = Todo.query.get_or_404(todo_id)
+        todo.completed = not todo.completed
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'completed': todo.completed
+        }), 200
+    except Exception as e:
+        print(f"Error toggling todo: {e}")  # Add debugging
+        db.session.rollback()
+        return jsonify({'success': False}), 500
 
 @app.route('/tummy-time', methods=['POST'])
 def add_tummy_time():

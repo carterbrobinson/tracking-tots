@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:trackingtots/views/widgets/top_navigation_bar.dart';
 import 'package:trackingtots/user_state.dart';
-
-
+import 'package:trackingtots/views/widgets/form_builder.dart';
+import 'package:trackingtots/views/widgets/modal_sheet.dart';
 
 class TodoForm extends StatefulWidget {
   @override
@@ -16,6 +17,15 @@ class _TodoFormState extends State<TodoForm> {
   DateTime _time = DateTime.now();
   String _notes = '';
   List<Map<String, dynamic>> _todos = [];
+  int _todayTasks = 0;
+  int _completedTasks = 0;
+  int _pendingTasks = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTodos();
+  }
 
   Future<void> _fetchTodos() async {
     if (UserState.userId == null) {
@@ -25,17 +35,112 @@ class _TodoFormState extends State<TodoForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
-    final response = await http.get(Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}')); // Change when I do user accounts
+    final response = await http.get(Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'));
+    print('Fetch Response: ${response.body}');
     if (response.statusCode == 200) {
       setState(() {
         _todos = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+        _processData();
       });
     }
   }
-  @override
-  void initState() {
-    super.initState();
-    _fetchTodos();
+
+  void _processData() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    _todayTasks = _todos.where((todo) {
+      final todoDate = DateTime.parse(todo['time']);
+      return todoDate.year == today.year &&
+             todoDate.month == today.month &&
+             todoDate.day == today.day;
+    }).length;
+
+    _completedTasks = _todos.where((todo) => todo['completed'] == true).length;
+    _pendingTasks = _todos.length - _completedTasks;
+  }
+
+  Widget _buildTodoSummaryCards() {
+    return Container(
+      height: 160,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          CommonFormWidgets.buildSummaryCard(
+            'Today Tasks',
+            '$_todayTasks',
+            Icons.today,
+            Colors.indigo,
+          ),
+          CommonFormWidgets.buildSummaryCard(
+            'Completed Tasks',
+            '$_completedTasks',
+            Icons.check_circle,
+            Colors.green,
+          ),
+          CommonFormWidgets.buildSummaryCard(
+            'Pending Tasks',
+            '$_pendingTasks',
+            Icons.pending,
+            Colors.amber,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddTodoDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => BaseModalSheet(
+        title: 'Add Todo',
+        children: [
+          Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                CommonFormWidgets.buildFormCard(
+                  title: 'Due Date & Time',
+                  child: CommonFormWidgets.buildDateTimePickerForward(
+                    initialDateTime: _time,
+                    minimumDate: DateTime.now(),
+                    onDateTimeChanged: (newTime) => setState(() => _time = newTime),
+                  ),
+                ),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'Task Description',
+                  child: TextFormField(
+                    decoration: InputDecoration(
+                      hintText: 'Enter your todo',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    maxLines: 3,
+                    onChanged: (value) => _notes = value,
+                    validator: (value) => value == null || value.isEmpty ? 'Enter a task description' : null,
+                  ),
+                ),
+                SizedBox(height: 24),
+                CommonFormWidgets.buildSubmitButton(
+                  text: 'Save Task',
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      _submit();
+                      Navigator.pop(context);
+                    }
+                  }
+                )
+              ]
+            )
+          )
+        ]
+      )
+    );
   }
 
   Future<void> _submit() async {
@@ -53,7 +158,7 @@ class _TodoFormState extends State<TodoForm> {
         'notes': _notes,
       };
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:5000/todo'),
+        Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
@@ -73,16 +178,44 @@ class _TodoFormState extends State<TodoForm> {
   }
 
   Future<void> _deleteTodos(int id) async {
-    final response =
-        await http.delete(Uri.parse('http://127.0.0.1:5000/todo/$id'));
-    if (response.statusCode == 200) {
+    try {
+      final response = await http.delete(Uri.parse('http://127.0.0.1:5000/todo/$id'));
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Todo deleted')),
+        );
+        await _fetchTodos();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed')),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Todo deleted')),
+        SnackBar(content: Text('Network error: Could not delete todo')),
       );
-      _fetchTodos();
-    } else {
+    }
+  }
+
+  Future<void> _toggleTodoStatus(int id) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('http://127.0.0.1:5000/todo/$id/toggle'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      print('Toggle Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        await _fetchTodos();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating todo status')),
+        );
+      }
+    } catch (e) {
+      print('Toggle Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed')),
+        SnackBar(content: Text('Network error: Could not update todo status')),
       );
     }
   }
@@ -92,60 +225,99 @@ class _TodoFormState extends State<TodoForm> {
     return Scaffold(
       appBar: TopNavigationBar(title: 'Todo List'),
       backgroundColor: Colors.purple[50],
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            children: [
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      decoration: InputDecoration(
-                        labelText: 'Task Notes',
-                        hintText: 'Enter your todo',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (value) => _notes = value,
-                      validator: (value) =>
-                          value == null || value.isEmpty ? 'Enter something' : null,
-                    ),
-                    SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _submit,
-                      child: Text('Add Todo'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
-                      ),
-                    ),
-                  ],
-                ),
+      body: CustomScrollView(
+        slivers: <Widget>[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildTodoSummaryCards(),
+                  SizedBox(height: 20),
+                ],
               ),
-              Divider(height: 30),
-              _todos.isEmpty
-                  ? Center(child: Text('No todos yet'))
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      itemCount: _todos.length,
-                      itemBuilder: (context, index) {
-                        final todo = _todos[index];
-                        return Card(
-                          margin: EdgeInsets.symmetric(vertical: 5),
-                          child: ListTile(
-                            title: Text(todo['notes'] ?? ''),
-                            trailing: IconButton(
-                              icon: Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteTodos(todo['id']),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.all(16),
+            sliver: _todos.isEmpty
+              ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Text(
+                      'No todos yet',
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final todo = _todos[index];
+                      final todoDate = DateTime.parse(todo['time']);
+                      return Card(
+                        elevation: 4,
+                        margin: EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ListTile(
+                          leading: Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurple.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              todo['completed'] == true ? Icons.check_circle : Icons.circle,
+                              color: Colors.deepPurple,
                             ),
                           ),
-                        );
-                      },
-                    ),
-            ],
+                          title: Text(
+                            todo['notes'] ?? '',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              decoration: todo['completed'] == true 
+                                ? TextDecoration.lineThrough 
+                                : TextDecoration.none,
+                            ),
+                          ),
+                          subtitle: Text(
+                            DateFormat('EEE, MMM d - h:mm a').format(todoDate),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  todo['completed'] == true 
+                                    ? Icons.check_circle 
+                                    : Icons.radio_button_unchecked,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () => _toggleTodoStatus(todo['id']),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _deleteTodos(todo['id']),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: _todos.length,
+                  ),
+                ),
           ),
-        ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddTodoDialog(context),
+        child: Icon(Icons.add),
+        backgroundColor: Colors.deepPurple,
       ),
     );
   }

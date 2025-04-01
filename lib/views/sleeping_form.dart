@@ -6,6 +6,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:trackingtots/views/widgets/top_navigation_bar.dart';
 import 'package:trackingtots/user_state.dart';
+import 'package:trackingtots/views/widgets/form_builder.dart';
+import 'package:trackingtots/views/widgets/modal_sheet.dart';
 
 
 class SleepingForm extends StatefulWidget {
@@ -22,9 +24,10 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
   late TabController _tabController;
   bool _isWeeklyView = true;
   Map<String, List<FlSpot>> _groupedData = {};
-  double _totalSleepHours = 0;
+  double _dailySleepHours = 0;
   double _averageSleepHours = 0;
   double _longestSleep = 0;
+  double _duration = 0.0;
 
   /// Formats DateTime as `YYYY-MM-DD HH:MM:SS`
   String _formatDateTime(DateTime dateTime) {
@@ -77,9 +80,21 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
   void _processData() {
     if (_sleepData.isEmpty) return;
 
-    _totalSleepHours = _sleepData.fold(0.0, (sum, spot) => sum + spot.y) / 60;
-    _averageSleepHours = _totalSleepHours / _sleepData.length;
-    _longestSleep = _sleepData.map((spot) => spot.y).reduce((max, value) => max > value ? max : value) / 60;
+    // Calculate daily sleep (for the current day)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todaySleep = _sleepData.where((spot) {
+      final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+      return date.year == today.year && 
+             date.month == today.month && 
+             date.day == today.day;
+    }).fold(0.0, (sum, spot) => sum + spot.y) / 60;
+
+    setState(() {
+      _dailySleepHours = todaySleep;
+      _averageSleepHours = _sleepData.fold(0.0, (sum, spot) => sum + spot.y) / (60 * _sleepData.length);
+      _longestSleep = _sleepData.map((spot) => spot.y).reduce((max, value) => max > value ? max : value) / 60;
+    });
 
     _groupedData = {};
     for (var spot in _sleepData) {
@@ -103,7 +118,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
                 children: [
                   _buildSleepSummaryCards(),
                   SizedBox(height: 20),
-                  _buildDataVisualizationTabs(),
+                  CommonFormWidgets.buildDataVisualizationTabs(_tabController),
                 ],
               ),
             ),
@@ -133,104 +148,26 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          _buildSummaryCard('Total Sleep', '${_totalSleepHours.toStringAsFixed(1)}h',
-          Icons.nightlight_round,
-          Colors.indigo,
+          CommonFormWidgets.buildSummaryCard(
+            'Daily Sleep', 
+            '${_dailySleepHours.toStringAsFixed(1)}h',  // Changed label from 'Total Sleep' to 'Daily Sleep'
+            Icons.nightlight_round,
+            Colors.indigo,
           ),
-          _buildSummaryCard('Average Sleep', '${_averageSleepHours.toStringAsFixed(1)}h',
-          Icons.trending_up,
-          Colors.teal,
+          CommonFormWidgets.buildSummaryCard(
+            'Average Sleep', 
+            '${_averageSleepHours.toStringAsFixed(1)}h',
+            Icons.trending_up,
+            Colors.teal,
           ),
-          _buildSummaryCard('Longest Sleep', '${_longestSleep.toStringAsFixed(1)}h',
-          Icons.timer,
-          Colors.amber,
+          CommonFormWidgets.buildSummaryCard(
+            'Longest Sleep', 
+            '${_longestSleep.toStringAsFixed(1)}h',
+            Icons.timer,
+            Colors.amber,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: EdgeInsets.all(8),
-      child: Container(
-        width: 160,
-        padding: EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataVisualizationTabs() {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.deepPurple.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            indicator: BoxDecoration(
-              borderRadius: BorderRadius.circular(25),
-              color: Colors.deepPurple,
-            ),
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.deepPurple,
-            tabs: [
-              Tab(text: 'Analytics'),
-              Tab(text: 'History'),
-            ],
-          ),
-        ),
-        SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CupertinoSegmentedControl(
-              children: {
-                true: Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Text('Weekly'),
-                ),
-                false: Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Text('Monthly'),
-                ),
-              },
-              groupValue: _isWeeklyView,
-              onValueChanged: (bool value) {
-                setState(() => _isWeeklyView = value);
-              },
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -383,229 +320,121 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Sleep Details',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 20),
-            ListTile(
-              leading: Icon(Icons.calendar_today, color: Colors.deepPurple),
-              title: Text('Date'),
-              subtitle: Text(DateFormat('EEEE, MMMM d, y').format(date)),
-            ),
-            ListTile(
-              leading: Icon(Icons.access_time, color: Colors.deepPurple),
-              title: Text('Duration'),
-              subtitle: Text('${(duration / 60).toStringAsFixed(1)} hours'),
-            ),
-          ],
-        ),
+      builder: (context) => BaseModalSheet(
+        title: "Sleep Details",
+        children: [
+          ListTile(
+            leading: Icon(Icons.calendar_today, color: Colors.deepPurple),
+            title: Text('Date'),
+            subtitle: Text(DateFormat('EEEE, MMMM d, y').format(date)),
+          ),
+          ListTile(
+            leading: Icon(Icons.access_time, color: Colors.deepPurple),
+            title: Text('Duration'),
+            subtitle: Text('${(duration / 60).toStringAsFixed(1)} hours'),
+          ),
+        ],
       ),
     );
-  }
-
-  Widget _buildTimePicker(String label, DateTime dateTime, Function(DateTime) onTimeSelected) {
-    return ListTile(
-      title: Text('$label: ${_formatDateTime(dateTime)}'),
-      trailing: Icon(Icons.keyboard_arrow_down),
-      onTap: () async {
-        TimeOfDay? picked = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay.fromDateTime(dateTime),
-        );
-
-        if (picked != null) {
-          onTimeSelected(DateTime(
-            dateTime.year,
-            dateTime.month,
-            dateTime.day,
-            picked.hour,
-            picked.minute,
-            0,
-          ));
-        }
-      },
-    );
-  }
-
-  Future<void> _submit() async {
-    if (UserState.userId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Please log in to add a sleeping.'))
-        );
-        Navigator.pushReplacementNamed(context, '/login');
-        return;
-    }
-    final data = {
-      'user_id': UserState.userId,
-      'start_time': _startTime.toIso8601String(),
-      'end_time': _endTime.toIso8601String(),
-      'notes': _notes,
-    };
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:5000/sleeping/${UserState.userId}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    if (response.statusCode == 201) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sleeping added successfully!')),
-      );
-      _fetchSleepData();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding Sleeping.')),
-      );
-    }
   }
 
   void _showAddSleepDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.all(20).copyWith(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      backgroundColor: Colors.transparent,
+      builder: (context) => BaseModalSheet(
+        title: 'Add Sleep Session',
+        children: [
+          Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                CommonFormWidgets.buildFormCard(
+                  title: 'Start Time',
+                  child: CommonFormWidgets.buildDateTimePicker(
+                    initialDateTime: _startTime,
+                    onDateTimeChanged: (newTime) => setState(() => _startTime = newTime),
+                  ),
+                ),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'End Time',
+                  child: CommonFormWidgets.buildDateTimePicker(
+                    initialDateTime: _endTime,
+                    onDateTimeChanged: (newTime) => setState(() => _endTime = newTime),
+                  ),
+                ),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'Notes',
+                  child: CommonFormWidgets.buildNotesField(
+                    (value) => _notes = value,
+                  ),
+                ),
+                SizedBox(height: 24),
+                CommonFormWidgets.buildSubmitButton(
+                  text: 'Save Sleep Session',
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      _submit();
+                      Navigator.pop(context);
+                    }   
+                  }
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Add Sleep Session',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                ),
-              ),
-              SizedBox(height: 20),
-              Container(
-                height: 180,
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.dateAndTime,
-                  initialDateTime: _startTime,
-                  maximumDate: DateTime.now(),
-                  minimumDate: DateTime.now().subtract(Duration(days: 7)),
-                  onDateTimeChanged: (DateTime newDateTime) {
-                    setModalState(() => _startTime = newDateTime);
-                  },
-                ),
-              ),
-              SizedBox(height: 10),
-              Container(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Sleep Duration',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        children: [
-                          for (int hours in [6, 7, 8, 9, 10])
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4),
-                              child: ChoiceChip(
-                                label: Text('$hours hours'),
-                                selected: _endTime.difference(_startTime).inHours == hours,
-                                onSelected: (bool selected) {
-                                  if (selected) {
-                                    setModalState(() {
-                                      _endTime = _startTime.add(Duration(hours: hours));
-                                    });
-                                  }
-                                },
-                                selectedColor: Colors.deepPurple,
-                                labelStyle: TextStyle(
-                                  color: _endTime.difference(_startTime).inHours == hours
-                                      ? Colors.white
-                                      : Colors.black,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                            icon: Icon(Icons.more_horiz),
-                            onPressed: () async {
-                              // Show a number picker or custom input for different durations
-                              final TimeOfDay? picked = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay(hour: 8, minute: 0),
-                              );
-                              if (picked != null) {
-                                setModalState(() {
-                                  _endTime = _startTime.add(
-                                    Duration(hours: picked.hour, minutes: picked.minute),
-                                  );
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 20),
-              TextFormField(
-                decoration: InputDecoration(
-                  labelText: 'Notes',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.deepPurple, width: 2),
-                  ),
-                  prefixIcon: Icon(Icons.note, color: Colors.deepPurple),
-                ),
-                onChanged: (value) => _notes = value,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  _submit();
-                  Navigator.pop(context);
-                },
-                child: Text('Save Sleep Session'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
+  }
+
+  Future<void> _submit() async {
+    if (UserState.userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please log in to add a sleeping session.'))
+      );
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
+    // Validate that end time is after start time
+    if (_endTime.isBefore(_startTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('End time must be after start time'))
+      );
+      return;
+    }
+
+    final data = {
+      'user_id': UserState.userId,
+      'start_time': _startTime.toIso8601String(),
+      'end_time': _endTime.toIso8601String(),
+      'notes': _notes ?? '',
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:5000/sleeping/${UserState.userId}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sleep session added successfully!'))
+        );
+        _fetchSleepData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding sleep session.'))
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not add sleep session.'))
+      );
+    }
   }
 }

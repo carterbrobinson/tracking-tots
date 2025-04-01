@@ -31,8 +31,8 @@ class MyApp extends StatelessWidget {
         '/diaper': (context) => DiaperForm(),
         '/tummy': (context) => TummyTimeForm(),
         '/todo': (context) => TodoForm(),
-        '/signup': (context) => SignupPage(),
-        '/login': (context) => LoginPage(),
+        '/signup': (context) => AuthenticationWrapper(child: SignupPage()),
+        '/login': (context) => AuthenticationWrapper(child: LoginPage()),
       },
       theme: ThemeData(
         primaryColor: Colors.deepPurple[300],
@@ -48,5 +48,44 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
     );
+  }
+}
+
+class AuthenticationWrapper extends StatelessWidget {
+  final Widget child;
+
+  const AuthenticationWrapper({Key? key, required this.child}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    if (UserState.isLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Already Logged In'),
+            content: Text('You are already logged in as ${UserState.name}'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back to previous screen
+                },
+                child: Text('Go Back'),
+              ),
+              TextButton(
+                onPressed: () {
+                  UserState.clear(); // Log out
+                  Navigator.of(context).pop(); // Close dialog
+                  // Stay on login/signup page
+                },
+                child: Text('Log Out'),
+              ),
+            ],
+          ),
+        );
+      });
+    }
+    return child;
   }
 }
