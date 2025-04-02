@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1089758434564",
+    "project_id": "tracking-tots",
+    "storage_bucket": "tracking-tots.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1089758434564:android:7d11115c52335433392c51",
+        "android_client_info": {
+          "package_name": "com.example.trackingtots"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFTOdLkd7n8VjrV_v65CuFst6ovoc_KYE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
