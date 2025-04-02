@@ -27,90 +27,126 @@ class _ChatbotState extends State<Chatbot> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: TopNavigationBar(title: "Chatbot Page"),
+      appBar: TopNavigationBar(title: "Parenting Assistant"),
       backgroundColor: Colors.purple[50],
       body: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: SingleChildScrollView(
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * .95,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 38),
-                    if (!isConversationStarted) ...[
-                      Image.asset("assets/rattle.png"),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Parenting Queries",
-                        style: textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        "Ask anything, get your answer",
-                        style: textTheme.bodyMedium,
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.wb_sunny_outlined),
-                              const SizedBox(height: 6),
-                              Text(
-                                "Examples",
-                                style: textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 40),
-                              const ExampleWidget(text: "What is your baby doing now?"),
-                              const ExampleWidget(text: "When should I sleep?"),
-                              const ExampleWidget(text: "Is it normal that my baby does this?"),
-                            ],
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 38),
+                      if (!isConversationStarted) ...[
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.deepPurple.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Image.asset(
+                            "assets/rattle.png",
+                            height: 80,
+                            width: 80,
                           ),
                         ),
-                      ),
-                    ] else ...[
-                      Expanded(child: ChatListView(conversations: conversations)),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Parenting Queries",
+                          style: textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepPurple,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "Ask anything, get your answer",
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        Icon(Icons.lightbulb_outline, 
+                          color: Colors.deepPurple,
+                          size: 28,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Try asking about:",
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepPurple,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ExampleWidget(text: "What is normal sleep for my baby?"),
+                        const SizedBox(height: 12),
+                        ExampleWidget(text: "When should I start solid foods?"),
+                        const SizedBox(height: 12),
+                        ExampleWidget(text: "How often should my baby have wet diapers?"),
+                      ] else ...[
+                        ChatListView(conversations: conversations),
+                      ],
                     ],
-                    ChatTextField(
-                      controller: controller,
-                      onSubmitted: (question) {
-                        controller.clear();
-                        FocusScope.of(context).unfocus();
-                        conversations.add(Conversation(question!, ""));
-                        setState(() {});
-                        post(
-                          Uri.parse('http://127.0.0.1:5000/get-response'),
-                          body: jsonEncode({"text": question}),
-                          headers: {'Content-Type': "application/json"},
-                        ).then((response) {
-                          var jsonResponse = jsonDecode(response.body);
-                          String result = jsonResponse.containsKey('response')
-                              ? jsonResponse['response']
-                              : "Error: No response received";
-                          
-                          conversations.last = Conversation(conversations.last.question, result);
-                          setState(() {});
-                        }).catchError((error) {
-                          conversations.last = Conversation(conversations.last.question, "Error: Failed to get response");
-                          setState(() {});
-                        });
-
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              padding: EdgeInsets.all(16),
+              child: ChatTextField(
+                controller: controller,
+                onSubmitted: (question) {
+                  if (question?.trim().isEmpty ?? true) return;
+                  
+                  controller.clear();
+                  FocusScope.of(context).unfocus();
+                  setState(() {
+                    conversations.add(Conversation(question!, "Thinking..."));
+                  });
+                  
+                  post(
+                    Uri.parse('http://127.0.0.1:5000/get-response'),
+                    body: jsonEncode({"text": question}),
+                    headers: {'Content-Type': "application/json"},
+                  ).then((response) {
+                    var jsonResponse = jsonDecode(response.body);
+                    String result = jsonResponse.containsKey('response')
+                        ? jsonResponse['response']
+                        : "Error: No response received";
+                    
+                    setState(() {
+                      conversations.last = Conversation(
+                        conversations.last.question, 
+                        result
+                      );
+                    });
+                  }).catchError((error) {
+                    setState(() {
+                      conversations.last = Conversation(
+                        conversations.last.question,
+                        "Error: Failed to get response"
+                      );
+                    });
+                  });
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
