@@ -15,7 +15,7 @@ app = Flask(__name__)
 CORS(app)
 
 # SQLite Database Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///baby_tracker.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/baby_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
