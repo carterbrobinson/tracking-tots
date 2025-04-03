@@ -105,11 +105,11 @@ def login():
         return jsonify({"message": "Invalid email or password"}), 401
         
 
-@app.route('/feeding', methods=['POST'])
-def add_feeding():
+@app.route('/feeding/<int:user_id>', methods=['POST'])
+def add_feeding(user_id):
     data = request.json
     new_feeding = Feeding(
-        user_id=data['user_id'],
+        user_id=user_id,
         type=data['type'],
         left_breast_duration=data.get('left_breast_duration'),
         right_breast_duration=data.get('right_breast_duration'),
@@ -171,7 +171,7 @@ def get_diaper_change_data(user_id):
 def add_diaper_change(user_id):
     data = request.json
     new_diaper_change = DiaperChange(
-        user_id=data['user_id'],
+        user_id=user_id,
         type=data['type'],
         time=datetime.datetime.fromisoformat(data['time']),
         notes=data.get('notes')
@@ -184,7 +184,7 @@ def add_diaper_change(user_id):
 def add_task(user_id):
     data = request.json
     new_task = Todo(
-        user_id=data['user_id'],
+        user_id=user_id,
         time=datetime.datetime.fromisoformat(data['time']),
         notes=data.get('notes')
     )
@@ -227,15 +227,15 @@ def toggle_todo(todo_id):
         db.session.rollback()
         return jsonify({'success': False}), 500
 
-@app.route('/tummy-time', methods=['POST'])
-def add_tummy_time():
+@app.route('/tummy-time/<int:user_id>', methods=['POST'])
+def add_tummy_time(user_id):
     data = request.json
     start_time = datetime.datetime.fromisoformat(data['start_time'])
     end_time = datetime.datetime.fromisoformat(data['end_time'])
     duration = int((end_time - start_time).total_seconds() / 60)
 
     tummy_time = TummyTime(
-        user_id=data['user_id'],
+        user_id=user_id,
         start_time=start_time,
         end_time=end_time,
         duration=duration,
