@@ -52,7 +52,8 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
     }
 
     final response = await http.get(
-      Uri.parse('http://127.0.0.1:5000/diaper-change/${UserState.userId}')
+      // Uri.parse('http://127.0.0.1:5000/diaper-change/${UserState.userId}')
+      Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}')
     );
 
     if (response.statusCode == 200) {
@@ -276,7 +277,8 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
     };
     
     final response = await http.post(
-      Uri.parse('http://127.0.0.1:5000/diaper-change/${UserState.userId}'),
+      // Uri.parse('http://127.0.0.1:5000/diaper-change/${UserState.userId}'),
+      Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );

@@ -52,7 +52,8 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       return;
     }
     final response = await http.get(
-      Uri.parse('http://127.0.0.1:5000/feeding/${UserState.userId}')
+      // Uri.parse('http://127.0.0.1:5000/feeding/${UserState.userId}')
+      Uri.parse('https://tracking-tots.onrender.com/feeding/${UserState.userId}')
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -328,7 +329,8 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
     };
     
     final response = await http.post(
-      Uri.parse('http://127.0.0.1:5000/feeding/${UserState.userId}'),
+      // Uri.parse('http://127.0.0.1:5000/feeding/${UserState.userId}'),
+      Uri.parse('https://tracking-tots.onrender.com/feeding/${UserState.userId}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );

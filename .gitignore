@@ -145,3 +145,23 @@ app.*.map.json
 # Node/JS cache (in case you add web stuff later)
 node_modules/
 /android/app/release
+
+# Firebase
+.firebase/
+.firebaserc
+firebase.json
+
+# Generated files
+dataconnect-generated/
+dataconnect/
+**/GeneratedPluginRegistrant.*
+**/generated_plugin_registrant.*
+**/generated_plugins.cmake
+
+# iOS/macOS specific
+ios/Podfile.lock
+ios/Runner.xcodeproj/project.pbxproj
+macos/Runner.xcodeproj/project.pbxproj
+
+# Build files
+build/

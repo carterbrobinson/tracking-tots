@@ -29,7 +29,8 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
-    final response = await http.get(Uri.parse('http://127.0.0.1:5000/tummy-time/${UserState.userId}')); 
+    // final response = await http.get(Uri.parse('http://127.0.0.1:5000/tummy-time/${UserState.userId}')); 
+    final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/tummy-time/${UserState.userId}')); 
     if (response.statusCode == 200) {
       setState(() {
         _tummyTime = List<Map<String, dynamic>>.from(jsonDecode(response.body));
@@ -99,7 +100,8 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
         'notes': _notes,
       };
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:5000/tummy-time'),
+        // Uri.parse('http://127.0.0.1:5000/tummy-time'),
+        Uri.parse('https://tracking-tots.onrender.com/tummy-time'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );

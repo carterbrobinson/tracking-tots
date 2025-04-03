@@ -35,7 +35,8 @@ class _TodoFormState extends State<TodoForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
-    final response = await http.get(Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'));
+    final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'));
+    // final response = await http.get(Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'));
     print('Fetch Response: ${response.body}');
     if (response.statusCode == 200) {
       setState(() {
@@ -158,7 +159,8 @@ class _TodoFormState extends State<TodoForm> {
         'notes': _notes,
       };
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'),
+        // Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'),
+        Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
@@ -179,7 +181,8 @@ class _TodoFormState extends State<TodoForm> {
 
   Future<void> _deleteTodos(int id) async {
     try {
-      final response = await http.delete(Uri.parse('http://127.0.0.1:5000/todo/$id'));
+      // final response = await http.delete(Uri.parse('http://127.0.0.1:5000/todo/$id'));
+      final response = await http.delete(Uri.parse('https://tracking-tots.onrender.com/todo/$id'));
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Todo deleted')),
@@ -200,7 +203,8 @@ class _TodoFormState extends State<TodoForm> {
   Future<void> _toggleTodoStatus(int id) async {
     try {
       final response = await http.patch(
-        Uri.parse('http://127.0.0.1:5000/todo/$id/toggle'),
+        // Uri.parse('http://127.0.0.1:5000/todo/$id/toggle'),
+        Uri.parse('https://tracking-tots.onrender.com/todo/$id/toggle'),
         headers: {'Content-Type': 'application/json'},
       );
       print('Toggle Response: ${response.body}');
