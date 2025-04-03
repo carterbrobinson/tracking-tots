@@ -313,6 +313,9 @@ def get_response():
         print(f"OpenAI API Error: {e}")  # Debugging
         return jsonify({"response": "Error: AI service unavailable"}), 500
 
+@app.route("/", methods=["GET"])
+def index():
+    return "🎉 Baby Tracker API is Live!"
 
 
 if __name__ == '__main__':
