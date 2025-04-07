@@ -29,8 +29,8 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
-    // final response = await http.get(Uri.parse('http://127.0.0.1:5000/tummy-time/${UserState.userId}')); 
-    final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/tummy-time/${UserState.userId}')); 
+    final response = await http.get(Uri.parse('http://127.0.0.1:5001/tummy-time/${UserState.userId}')); 
+    // final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/tummy-time/${UserState.userId}')); 
     if (response.statusCode == 200) {
       setState(() {
         _tummyTime = List<Map<String, dynamic>>.from(jsonDecode(response.body));
@@ -100,8 +100,8 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
         'notes': _notes,
       };
       final response = await http.post(
-        // Uri.parse('http://127.0.0.1:5000/tummy-time'),
-        Uri.parse('https://tracking-tots.onrender.com/tummy-time'),
+        Uri.parse('http://127.0.0.1:5001/tummy-time/${UserState.userId}'),
+        // Uri.parse('https://tracking-tots.onrender.com/tummy-time/${UserState.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
@@ -165,7 +165,7 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple[400],
+                          color: Color(0xFF6A359C),
                         ),
                       ),
                       SizedBox(height: 10),
@@ -174,7 +174,7 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                         style: TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple[400],
+                          color: Color(0xFF6A359C),
                         ),
                       ),
                       SizedBox(height: 20),
@@ -196,12 +196,12 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                           ),
                           ElevatedButton.icon(
                             icon: Icon(_isRunning ? Icons.pause : Icons.play_arrow,
-                            color: _isRunning ? Colors.deepPurple[400] : Colors.white),
+                            color: _isRunning ? Color(0xFF6A359C) : Colors.white),
                             label: Text(_isRunning ? 'Pause' : 'Resume'),
                             onPressed: _isRunning ? _pauseTimer : _resumeTimer,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isRunning ? Colors.deepPurple[50] : Colors.deepPurple[300],
-                              foregroundColor: _isRunning? Colors.deepPurple[400] : Colors.white,
+                              backgroundColor: _isRunning ? Color(0xFF6A359C) : Color(0xFF6A359C),
+                              foregroundColor: _isRunning? Color(0xFF6A359C) : Colors.white,
                               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
@@ -229,17 +229,17 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                       TextFormField(
                         decoration: InputDecoration(
                           labelText: 'Notes',
-                          labelStyle: TextStyle(color: Colors.deepPurple),
+                          labelStyle: TextStyle(color: Color(0xFF6A359C)),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.deepPurple),
+                            borderSide: BorderSide(color: Color(0xFF6A359C)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                            borderSide: BorderSide(color: Color(0xFF6A359C), width: 2),
                           ),
                           hintText: 'Enter notes about tummy time here...',
-                          prefixIcon: Icon(Icons.note, color: Colors.deepPurple),
+                          prefixIcon: Icon(Icons.note, color: Color(0xFF6A359C)),
                         ),
                         maxLines: 3,
                         onChanged: (value) => _notes = value,
@@ -248,7 +248,7 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                       ElevatedButton(
                         onPressed: _submit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple[300],
+                          backgroundColor: Color(0xFF6A359C),
                           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
@@ -278,7 +278,7 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.deepPurple[400],
+                            color: Color(0xFF6A359C),
                           ),
                         ),
                         SizedBox(height: 8),
@@ -301,12 +301,12 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                                     return Card(
                                       margin: EdgeInsets.symmetric(vertical: 8),
                                       child: ListTile(
-                                        leading: Icon(Icons.timer, color: Colors.deepPurple),
+                                        leading: Icon(Icons.timer, color: Color(0xFF6A359C)),
                                         title: Text(
                                           _formatDuration(duration),
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.deepPurple,
+                                            color: Color(0xFF6A359C),
                                           ),
                                         ),
                                         subtitle: Column(

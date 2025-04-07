@@ -52,8 +52,8 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
     }
 
     final response = await http.get(
-      // Uri.parse('http://127.0.0.1:5000/diaper-change/${UserState.userId}')
-      Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}')
+      Uri.parse('http://127.0.0.1:5001/diaper-change/${UserState.userId}')
+      // Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}')
     );
 
     if (response.statusCode == 200) {
@@ -132,17 +132,29 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAnalytics(),
                 _buildDiaperList(),
+                _buildAnalytics(),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDiaperDialog(context),
-        child: Icon(Icons.add),
-        backgroundColor: Colors.deepPurple,
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+            begin: Alignment.bottomLeft,
+            end: Alignment.topRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showAddDiaperDialog(context),
+          child: Icon(Icons.add),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          hoverElevation: 0,
+        ),
       ),
     );
   }
@@ -157,7 +169,7 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
               spots: _diaperData,
               isCurved: true,
               gradient: LinearGradient(
-                colors: [Colors.deepPurple, Colors.purple],
+                colors: [Color(0xFF6A359C), Colors.purple],
               ),
               barWidth: 4,
               dotData: FlDotData(show: true),
@@ -191,8 +203,8 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
         return Card(
           margin: EdgeInsets.only(bottom: 8),
           child: ListTile(
-            leading: Icon(Icons.baby_changing_station, color: Colors.deepPurple),
-            title: Text(DateFormat('MMMM d, y').format(date)),
+            leading: Icon(Icons.baby_changing_station, color: Color(0xFF6A359C)),
+            title: Text(DateFormat('MMMM d, y – h:mm a').format(date)),
             subtitle: Text(_type),
             trailing: Text(_notes ?? ''),
           ),
@@ -206,57 +218,81 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => BaseModalSheet(
-        title: 'Add Diaper Change',
-        children: [
-          CommonFormWidgets.buildFormCard(
-            title: 'Time',
-            child: CommonFormWidgets.buildDateTimePicker(
-              initialDateTime: _time,
-              onDateTimeChanged: (newTime) => setState(() => _time = newTime),
-            ),
+      builder: (BuildContext context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom
           ),
-          SizedBox(height: 16),
-          CommonFormWidgets.buildFormCard(
-            title: 'Type',
-            child: DropdownButtonFormField<String>(
-              value: _type,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+          child: SingleChildScrollView(
+            child: BaseModalSheet(
+              title: 'Add Diaper Change',
+              children: [
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CommonFormWidgets.buildFormCard(
+                        title: 'Time',
+                        child: CommonFormWidgets.buildDateTimePicker(
+                          initialDateTime: _time,
+                          onDateTimeChanged: (newTime) {
+                            if (mounted) {
+                              setState(() => _time = newTime);
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      CommonFormWidgets.buildFormCard(
+                        title: 'Type',
+                        child: DropdownButtonFormField<String>(
+                          value: _type,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          items: ['Wet', 'Dirty', 'Mixed'].map((type) {
+                            return DropdownMenuItem(
+                              value: type,
+                              child: Text(type),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null && mounted) {
+                              setState(() => _type = value);
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      CommonFormWidgets.buildFormCard(
+                        title: 'Notes',
+                        child: CommonFormWidgets.buildNotesField(
+                          (value) => _notes = value ?? '',
+                        ),
+                      ),
+                      SizedBox(height: 24),
+                      CommonFormWidgets.buildSubmitButton(
+                        text: 'Save Diaper Change',
+                        onPressed: () {
+                          if (_formKey.currentState?.validate() ?? false) {
+                            _submit();
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  ),
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              items: ['Wet', 'Dirty', 'Mixed'].map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() => _type = value!);
-              },
+              ],
             ),
           ),
-          SizedBox(height: 16),
-          CommonFormWidgets.buildFormCard(
-            title: 'Notes',
-            child: CommonFormWidgets.buildNotesField(
-              (value) => _notes = value,
-            ),
-          ),
-          SizedBox(height: 24),
-          CommonFormWidgets.buildSubmitButton(
-            text: 'Save Diaper Change',
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                _submit();
-                Navigator.pop(context);
-              }
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -277,8 +313,8 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
     };
     
     final response = await http.post(
-      // Uri.parse('http://127.0.0.1:5000/diaper-change/${UserState.userId}'),
-      Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}'),
+      Uri.parse('http://127.0.0.1:5001/diaper-change/${UserState.userId}'),
+      // Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );

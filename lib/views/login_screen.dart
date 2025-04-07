@@ -20,11 +20,22 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.purple[50],
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text("Login"),
-        backgroundColor: Colors.deepPurple[300],
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+              begin: Alignment.bottomLeft,
+              end: Alignment.topRight,
+            ),
+          ),
+          child: AppBar(
+            title: const Text("Login"),
+            backgroundColor: Colors.transparent,
+            automaticallyImplyLeading: false,
+          ),
+        ),
       ),
       body: Container(
         padding: const EdgeInsets.all(24),
@@ -114,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
               suffixIcon: IconButton(
                 icon: Icon(
                   _passwordVisible ? Icons.visibility : Icons.visibility_off,
-                  color: Colors.deepPurple[300],
+                  color: const Color(0xFF6A359C),
                 ),
                 onPressed: () {
                   setState(() {
@@ -134,7 +145,43 @@ class _LoginPageState extends State<LoginPage> {
               return null;
             },
             onChanged: (value) => _password = value,
-          ),        
+            onFieldSubmitted: (_) async {
+              if (_formKey.currentState!.validate()) {
+                final url = Uri.parse('http://127.0.0.1:5001/login');
+                // final url = Uri.parse('https://tracking-tots.onrender.com/login');
+                try {
+                  final response = await http.post(
+                    url,
+                    headers: {'Content-Type': 'application/json'},
+                    body: jsonEncode({
+                      'email': _emailController.text,
+                      'password': _passwordController.text,
+                    }),
+                  );
+
+                  if (!mounted) return;
+
+                  if (response.statusCode == 200) {
+                    final userData = jsonDecode(response.body);
+                    UserState.setUserData(userData['user_id'], userData['name'], userData['email']);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Login successful!")),
+                    );
+                    Navigator.pushReplacementNamed(context, '/');
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Invalid credentials")),
+                    );
+                  }
+                } catch (e) {
+                   if (!mounted) return;
+                   ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Login failed: ${e.toString()}")),
+                   );
+                }
+              }
+            },
+          ),
         ),
       ],
     );
@@ -144,35 +191,44 @@ class _LoginPageState extends State<LoginPage> {
     return ElevatedButton(
       onPressed: () async {
         if (_formKey.currentState!.validate()) {
-          // final url = Uri.parse('http://127.0.0.1:5000/login');
-          final url = Uri.parse('https://tracking-tots.onrender.com/login');
-          final response = await http.post(
-            url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'email': _emailController.text,
-            'password': _passwordController.text,
-          }),
-        );
+          final url = Uri.parse('http://127.0.0.1:5001/login');
+          // final url = Uri.parse('https://tracking-tots.onrender.com/login');
+          try {
+            final response = await http.post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'email': _emailController.text,
+                'password': _passwordController.text,
+              }),
+            );
 
-        if (response.statusCode == 200) {
-          final userData = jsonDecode(response.body);
-          UserState.setUserData(userData['user_id'], userData['name'], userData['email']);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Login successful!")),
-          );
-          Navigator.pushReplacementNamed(context, '/');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Invalid credentials")),
-          );
-        }
+            if (!mounted) return;
+
+            if (response.statusCode == 200) {
+              final userData = jsonDecode(response.body);
+              UserState.setUserData(userData['user_id'], userData['name'], userData['email']);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Login successful!")),
+              );
+              Navigator.pushReplacementNamed(context, '/');
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Invalid credentials")),
+              );
+            }
+          } catch (e) {
+             if (!mounted) return;
+             ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Login failed: ${e.toString()}")),
+             );
+          }
         }
       },
       style: ElevatedButton.styleFrom(
         shape: const StadiumBorder(),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 48),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: const Color(0xFF6A359C),
       ),
       child: const Text("Login", style: TextStyle(fontSize: 20)),
     );

@@ -35,8 +35,8 @@ class _TodoFormState extends State<TodoForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
-    final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'));
-    // final response = await http.get(Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'));
+    // final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'));
+    final response = await http.get(Uri.parse('http://127.0.0.1:5001/todo/${UserState.userId}'));
     print('Fetch Response: ${response.body}');
     if (response.statusCode == 200) {
       setState(() {
@@ -159,8 +159,8 @@ class _TodoFormState extends State<TodoForm> {
         'notes': _notes,
       };
       final response = await http.post(
-        // Uri.parse('http://127.0.0.1:5000/todo/${UserState.userId}'),
-        Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'),
+        Uri.parse('http://127.0.0.1:5001/todo/${UserState.userId}'),
+        // Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
@@ -181,8 +181,8 @@ class _TodoFormState extends State<TodoForm> {
 
   Future<void> _deleteTodos(int id) async {
     try {
-      // final response = await http.delete(Uri.parse('http://127.0.0.1:5000/todo/$id'));
-      final response = await http.delete(Uri.parse('https://tracking-tots.onrender.com/todo/$id'));
+      final response = await http.delete(Uri.parse('http://127.0.0.1:5001/todo/$id'));
+      // final response = await http.delete(Uri.parse('https://tracking-tots.onrender.com/todo/$id'));
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Todo deleted')),
@@ -203,8 +203,8 @@ class _TodoFormState extends State<TodoForm> {
   Future<void> _toggleTodoStatus(int id) async {
     try {
       final response = await http.patch(
-        // Uri.parse('http://127.0.0.1:5000/todo/$id/toggle'),
-        Uri.parse('https://tracking-tots.onrender.com/todo/$id/toggle'),
+        Uri.parse('http://127.0.0.1:5001/todo/$id/toggle'),
+        // Uri.parse('https://tracking-tots.onrender.com/todo/$id/toggle'),
         headers: {'Content-Type': 'application/json'},
       );
       print('Toggle Response: ${response.body}');
@@ -271,12 +271,12 @@ class _TodoFormState extends State<TodoForm> {
                           leading: Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.deepPurple.withOpacity(0.1),
+                              color: Color(0xFF6A359C).withOpacity(0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               todo['completed'] == true ? Icons.check_circle : Icons.circle,
-                              color: Colors.deepPurple,
+                              color: Color(0xFF6A359C),
                             ),
                           ),
                           title: Text(
@@ -318,10 +318,22 @@ class _TodoFormState extends State<TodoForm> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddTodoDialog(context),
-        child: Icon(Icons.add),
-        backgroundColor: Colors.deepPurple,
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+            begin: Alignment.bottomLeft,
+            end: Alignment.topRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showAddTodoDialog(context),
+          child: Icon(Icons.add),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          hoverElevation: 0,
+        ),
       ),
     );
   }

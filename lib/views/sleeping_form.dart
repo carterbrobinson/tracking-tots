@@ -47,8 +47,8 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
       return;
     }
 
-    // final response = await http.get(Uri.parse('http://127.0.0.1:5000/sleeping/${UserState.userId}'));
-    final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/sleeping/${UserState.userId}'));
+    final response = await http.get(Uri.parse('http://127.0.0.1:5001/sleeping/${UserState.userId}'));
+    // final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/sleeping/${UserState.userId}'));
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -128,20 +128,32 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAdvancedChart(),
                 _buildSleepList(),
+                _buildAdvancedChart(),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddSleepDialog(context),
-        child: Icon(Icons.add),
-        backgroundColor: Colors.deepPurple,
-      ),
-    );
-  }
+      floatingActionButton: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+                  begin: Alignment.bottomLeft,
+                  end: Alignment.topRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: FloatingActionButton(
+                onPressed: () => _showAddSleepDialog(context),
+                child: Icon(Icons.add),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                hoverElevation: 0,
+              ),
+            ),
+          );
+        }
 
   Widget _buildSleepSummaryCards() {
     return Container(
@@ -182,7 +194,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
               spots: _sleepData,
               isCurved: true,
               gradient: LinearGradient(
-                colors: [Colors.deepPurple, Colors.purple],
+                colors: [Color(0xFF6A359C), Colors.purple],
               ),
               barWidth: 4,
               isStrokeCapRound: true,
@@ -201,7 +213,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    Colors.deepPurple.withOpacity(0.3),
+                    Color(0xFF6A359C).withOpacity(0.3),
                     Colors.purple.withOpacity(0.1),
                   ],
                   begin: Alignment.topCenter,
@@ -297,10 +309,10 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
             leading: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.withOpacity(0.1),
+                color: Color(0xFF6A359C).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.nightlight_round, color: Colors.deepPurple),
+              child: Icon(Icons.nightlight_round, color: Color(0xFF6A359C)),
             ),
             title: Text(
               DateFormat('EEEE, MMMM d').format(date),
@@ -325,12 +337,12 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
         title: "Sleep Details",
         children: [
           ListTile(
-            leading: Icon(Icons.calendar_today, color: Colors.deepPurple),
+            leading: Icon(Icons.calendar_today, color: Color(0xFF6A359C)),
             title: Text('Date'),
             subtitle: Text(DateFormat('EEEE, MMMM d, y').format(date)),
           ),
           ListTile(
-            leading: Icon(Icons.access_time, color: Colors.deepPurple),
+            leading: Icon(Icons.access_time, color: Color(0xFF6A359C)),
             title: Text('Duration'),
             subtitle: Text('${(duration / 60).toStringAsFixed(1)} hours'),
           ),
@@ -417,8 +429,8 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
 
     try {
       final response = await http.post(
-        // Uri.parse('http://127.0.0.1:5000/sleeping/${UserState.userId}'),
-        Uri.parse('https://tracking-tots.onrender.com/sleeping/${UserState.userId}'),
+        Uri.parse('http://127.0.0.1:5001/sleeping/${UserState.userId}'),
+        // Uri.parse('https://tracking-tots.onrender.com/sleeping/${UserState.userId}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );

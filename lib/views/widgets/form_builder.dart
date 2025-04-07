@@ -41,20 +41,20 @@ class CommonFormWidgets {
   static Widget buildDataVisualizationTabs(TabController tabController) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.deepPurple.withOpacity(0.1),
+        color: Color(0xFF6A359C).withOpacity(0.1),
         borderRadius: BorderRadius.circular(25),
       ),
       child: TabBar(
         controller: tabController,
         indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(25),
-          color: Colors.deepPurple,
+          borderRadius: BorderRadius.circular(5),
+          color: Color(0xFF6A359C),
         ),
         labelColor: Colors.white,
-        unselectedLabelColor: Colors.deepPurple,
+        unselectedLabelColor: Color(0xFF6A359C),
         tabs: [
-          Tab(text: 'Analytics'),
           Tab(text: 'History'),
+          Tab(text: 'Analytics'),       
         ],
       ),
     );
@@ -112,7 +112,7 @@ class CommonFormWidgets {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Color(0xFF6A359C),
         padding: EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -177,7 +177,7 @@ class CommonFormWidgets {
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.deepPurple,
+            color: Color(0xFF6A359C),
           ),
         ),
         IconButton(

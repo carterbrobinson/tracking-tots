@@ -21,16 +21,15 @@ class ChatTextField extends StatelessWidget {
           Flexible(
             child: TextField(
               controller: controller,
+              onSubmitted: onSubmitted,
               cursorColor: Colors.white,
               decoration: const InputDecoration(border: InputBorder.none),
             ),
             ),
             Padding(padding: const EdgeInsets.all(4.0),
             child: IconButton(
-              onPressed: () {
-              onSubmitted(controller.text);
-            },
-            style: IconButton.styleFrom(
+              onPressed: () => onSubmitted(controller.text),
+              style: IconButton.styleFrom(
               backgroundColor: CustomColors.primary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4))),

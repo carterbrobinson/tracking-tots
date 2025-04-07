@@ -40,15 +40,25 @@ class MyApp extends StatelessWidget {
         '/login': (context) => AuthenticationWrapper(child: LoginPage()),
       },
       theme: ThemeData(
-        primaryColor: Colors.deepPurple[300],
         colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: Colors.deepPurple[300],
-          secondary: Colors.purpleAccent[100],
+          primary: Color(0xFF6A359C),
+          secondary: Color(0xFF9969C7),
         ),
-        scaffoldBackgroundColor: Colors.purple[50],
+        scaffoldBackgroundColor: Color(0xFFF3E5F5),
         fontFamily: 'Poppins',
-        textTheme: TextTheme(
-          bodyLarge: TextStyle(color: Colors.black),
+        appBarTheme: const AppBarTheme(
+          titleTextStyle: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            color: Colors.white,
+          ),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(
+            color: Colors.black, 
+            fontWeight: FontWeight.w800,
+          ),
         ),
         useMaterial3: true,
       ),

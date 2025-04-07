@@ -52,8 +52,8 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       return;
     }
     final response = await http.get(
-      // Uri.parse('http://127.0.0.1:5000/feeding/${UserState.userId}')
-      Uri.parse('https://tracking-tots.onrender.com/feeding/${UserState.userId}')
+      Uri.parse('http://127.0.0.1:5001/feeding/${UserState.userId}')
+      // Uri.parse('https://tracking-tots.onrender.com/feeding/${UserState.userId}')
     );
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -133,17 +133,29 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAnalytics(),
                 _buildFeedingList(),
+                _buildAnalytics(),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddFeedingDialog(context),
-        child: Icon(Icons.add),
-        backgroundColor: Colors.deepPurple,
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+            begin: Alignment.bottomLeft,
+            end: Alignment.topRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showAddFeedingDialog(context),
+          child: Icon(Icons.add),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          hoverElevation: 0,
+        ),
       ),
     );
   }
@@ -158,7 +170,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
               spots: _feedingData,
               isCurved: true,
               gradient: LinearGradient(
-                colors: [Colors.deepPurple, Colors.purple],
+                colors: [Color(0xFF6A359C), Colors.purple],
               ),
               barWidth: 4,
               dotData: FlDotData(show: true),
@@ -192,7 +204,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
         return Card(
           margin: EdgeInsets.only(bottom: 8),
           child: ListTile(
-            leading: Icon(Icons.restaurant, color: Colors.deepPurple),
+            leading: Icon(Icons.restaurant, color: Color(0xFF6A359C)),
             title: Text(DateFormat('MMMM d, y').format(date)),
             subtitle: Text(_type),
             trailing: Text(_type == 'Bottle' 
@@ -329,8 +341,8 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
     };
     
     final response = await http.post(
-      // Uri.parse('http://127.0.0.1:5000/feeding/${UserState.userId}'),
-      Uri.parse('https://tracking-tots.onrender.com/feeding/${UserState.userId}'),
+      Uri.parse('http://127.0.0.1:5001/feeding/${UserState.userId}'),
+      // Uri.parse('https://tracking-tots.onrender.com/feeding/${UserState.userId}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );

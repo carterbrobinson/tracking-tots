@@ -24,11 +24,22 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.purple[50],
-      appBar: AppBar(
-        title: const Text("Sign up"),
-        backgroundColor: Colors.deepPurple[300],
-        automaticallyImplyLeading: false,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+              begin: Alignment.bottomLeft,
+              end: Alignment.topRight,
+            ),
+          ),
+          child: AppBar(
+            title: const Text("Sign up"),
+            backgroundColor: Colors.transparent,
+            automaticallyImplyLeading: false,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Container(
@@ -154,7 +165,7 @@ class _SignupPageState extends State<SignupPage> {
                           suffixIcon: IconButton(
                             icon: Icon(
                               _passwordVisible ? Icons.visibility : Icons.visibility_off,
-                              color: Colors.deepPurple[300],
+                              color: Color(0xFF6A359C),
                             ),
                             onPressed: () {
                               setState(() {
@@ -197,7 +208,7 @@ class _SignupPageState extends State<SignupPage> {
                           suffixIcon: IconButton(
                             icon: Icon(
                               _confirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                              color: Colors.deepPurple[300],
+                              color: Color(0xFF6A359C),
                             ),
                             onPressed: () {
                               setState(() {
@@ -206,6 +217,31 @@ class _SignupPageState extends State<SignupPage> {
                             },
                           ),
                         ),
+                        onFieldSubmitted: (_) async {
+                          if (_formKey.currentState!.validate()) {
+                            final url = Uri.parse('http://127.0.0.1:5001/register');
+                            final response = await http.post(
+                              url,
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({
+                                'name': '${_firstNameController.text} ${_lastNameController.text}',
+                                'email': _emailController.text,
+                                'password': _passwordController.text,
+                              }),
+                            );
+
+                            if (response.statusCode == 201) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Sign up successful! Please login.")),
+                              );
+                              Navigator.pushNamed(context, '/login');
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Sign up failed. Please try again.")),
+                              );
+                            }
+                          }
+                        },
                         obscureText: !_confirmPasswordVisible,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -225,8 +261,8 @@ class _SignupPageState extends State<SignupPage> {
                 ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      // final url = Uri.parse('http://127.0.0.1:5000/register');
-                      final url = Uri.parse('https://tracking-tots.onrender.com/register');
+                      final url = Uri.parse('http://127.0.0.1:5001/register');
+                      // final url = Uri.parse('https://tracking-tots.onrender.com/register');
                       final response = await http.post(
                         url,
                         headers: {'Content-Type': 'application/json'},
@@ -252,7 +288,7 @@ class _SignupPageState extends State<SignupPage> {
                   style: ElevatedButton.styleFrom(
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 48),
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Color(0xFF6A359C),
                   ),
                   child: const Text("Sign Up", style: TextStyle(fontSize: 20)),
                 ),

@@ -317,10 +317,68 @@ def get_response():
 def index():
     return "🎉 Baby Tracker API is Live!"
 
+@app.route('/homepage/<int:user_id>', methods=['GET'])
+def get_homepage_data(user_id):
+    try:
+        feedings = Feeding.query.filter_by(user_id=user_id).all()
+        diaper_changes = DiaperChange.query.filter_by(user_id=user_id).all()
+        tummy_times = TummyTime.query.filter_by(user_id=user_id).all()
+        sleep = Sleep.query.filter_by(user_id=user_id).all()
+        
+        activities = []
+        activities.extend([{
+            "id": f.id,
+            "type": "Feeding",
+            "time": f.start_time.isoformat(),
+            "end_time": f.end_time.isoformat(),
+            "details": f"Type: {f.type}, Duration: {(f.end_time - f.start_time).total_seconds() / 60:.0f} minutes",
+            "notes": f.notes
+        } for f in feedings])
+
+        activities.extend([{
+            "id": d.id,
+            "type": "Diaper Change",
+            "activity_type": d.type,
+            "time": d.time.isoformat(),
+            "details": f"Type: {d.type}",
+            "notes": d.notes
+        } for d in diaper_changes])
+
+        activities.extend([{
+            "id": t.id,
+            "type": "Tummy Time",
+            "time": t.start_time.isoformat(),
+            "end_time": t.end_time.isoformat(),
+            "details": f"Duration: {t.duration} minutes",
+            "notes": t.notes
+        } for t in tummy_times])
+
+        activities.extend([{
+            "id": s.id,
+            "type": "Sleep",
+            "time": s.start_time.isoformat(),
+            "end_time": s.end_time.isoformat(),
+            "details": f"Duration: {(s.end_time - s.start_time).total_seconds() / 60:.0f} minutes",
+            "notes": s.notes
+        } for s in sleep])
+
+        activities.sort(key=lambda x: x['time'], reverse=True)
+
+        return jsonify({
+            "success": True,
+            "activities": activities
+        }), 200
+    
+    except Exception as e:
+        print(f"Error fetching homepage data: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching homepage data"
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5001))
     app.run(debug=True, host='0.0.0.0', port=port)
 

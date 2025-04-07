@@ -16,6 +16,11 @@ class BaseModalSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+          begin: Alignment.bottomLeft,
+          end: Alignment.topRight,
+        ),
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
