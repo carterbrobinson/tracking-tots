@@ -23,11 +23,24 @@ class _ChatbotState extends State<Chatbot> {
 
   bool get isConversationStarted => conversations.isNotEmpty;
 
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: TopNavigationBar(title: "Chatbot Page"),
+      appBar: TopNavigationBar(title: "Parenting Assistant"),
       backgroundColor: Colors.purple[50],
       body: SafeArea(
         child: Padding(
@@ -36,9 +49,10 @@ class _ChatbotState extends State<Chatbot> {
             children: [
               const SizedBox(height: 24), // Reduced top spacing
               if (!isConversationStarted) ...[
-                Image.asset(
-                  "assets/rattle.png",
-                  height: 120, // Control image size
+                Icon(
+                  Icons.family_restroom,
+                  size: 120,
+                  color: Color(0xFF6A359C),
                 ),
                 const SizedBox(height: 24),
                 Container(
@@ -51,7 +65,7 @@ class _ChatbotState extends State<Chatbot> {
                     "Parenting Queries",
                     style: textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.purple[700],
+                      color: Color(0xFF6A359C),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -60,7 +74,7 @@ class _ChatbotState extends State<Chatbot> {
                 Text(
                   "Ask anything, get your answer",
                   style: textTheme.bodyLarge?.copyWith(
-                    color: Colors.purple[900],
+                    color: Color(0xFF6A359C),
                   ),
                 ),
                 Expanded(
@@ -75,29 +89,32 @@ class _ChatbotState extends State<Chatbot> {
                           width: 1,
                         ),
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.wb_sunny_outlined,
-                            color: Colors.purple[700],
-                            size: 32,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            "Examples",
-                            style: textTheme.titleMedium?.copyWith(
-                              color: Colors.purple[900],
-                              fontWeight: FontWeight.bold,
+                      child: SizedBox(
+                        width: 400,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.wb_sunny_outlined,
+                              color: Color(0xFF6A359C),
+                              size: 32,
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          const ExampleWidget(text: "What is your baby doing now?"),
-                          const SizedBox(height: 12),
-                          const ExampleWidget(text: "When should I sleep?"),
-                          const SizedBox(height: 12),
-                          const ExampleWidget(text: "Is it normal that my baby does this?"),
-                        ],
+                            const SizedBox(height: 12),
+                            Text(
+                              "Examples",
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Color(0xFF6A359C),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const ExampleWidget(text: "What is your baby doing now?"),
+                            const SizedBox(height: 12),
+                            const ExampleWidget(text: "When should I sleep?"),
+                            const SizedBox(height: 12),
+                            const ExampleWidget(text: "Is it normal that my baby does this?"),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -109,11 +126,11 @@ class _ChatbotState extends State<Chatbot> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: ChatTextField(
                   controller: controller,
+                  focusNode: _focusNode,
                   onSubmitted: (question) {
                     if (question?.trim().isEmpty ?? true) return;
                     
                     controller.clear();
-                    FocusScope.of(context).unfocus();
                     setState(() {
                       conversations.add(Conversation(question!, "Thinking..."));
                     });
@@ -133,6 +150,7 @@ class _ChatbotState extends State<Chatbot> {
                           conversations.last.question, 
                           result
                         );
+                        _focusNode.requestFocus();
                       });
                     }).catchError((error) {
                       setState(() {
@@ -140,6 +158,7 @@ class _ChatbotState extends State<Chatbot> {
                           conversations.last.question,
                           "Error: Failed to get response. Please try again."
                         );
+                        _focusNode.requestFocus();
                       });
                       print("Error: $error");
                     });

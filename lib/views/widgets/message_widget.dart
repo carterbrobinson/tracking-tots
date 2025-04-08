@@ -21,12 +21,14 @@ class MessageWidget extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * .8
             ),
             decoration: BoxDecoration(
-                color: fromAi ? CustomColors.midGrey : CustomColors.primary,
+                color: fromAi ? Colors.white : Color(0xFF6A359C),
                 borderRadius: BorderRadius.circular(8).copyWith(
                     bottomLeft: fromAi ? const Radius.circular(0) : null,
                     bottomRight: !fromAi ? const Radius.circular(0) : null)),
             padding: const EdgeInsets.all(12),
-            child: Text(text),
+            child: Text(text, style: TextStyle(
+              color: fromAi ? Colors.black : Colors.white,
+            )),
           ),
         ],
       ),

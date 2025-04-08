@@ -71,10 +71,13 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       _feedingData = data.map((item) {
         final time = DateTime.parse(item['start_time']);
         _typeDistribution[item['type']] = (_typeDistribution[item['type']] ?? 0) + 1;
-        return FlSpot(time.millisecondsSinceEpoch.toDouble(), 
-          item['bottle_amount']?.toDouble() ?? 
-          (item['left_breast_duration'] ?? 0 + item['right_breast_duration'] ?? 0).toDouble()
-        );
+        double duration = 0;
+        if (item['type'] == 'Breast') {
+          duration = (item['left_breast_duration'] ?? 0 + item['right_breast_duration'] ?? 0).toDouble();
+        } else if (item['type'] == 'Bottle') {
+          duration = item['bottle_amount']?.toDouble() ?? 0;
+        }
+        return FlSpot(time.millisecondsSinceEpoch.toDouble(), duration);
       }).toList();
 
       _totalFeedings = data.length;
@@ -200,6 +203,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       itemBuilder: (context, index) {
         final spot = _feedingData[index];
         final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+        final duration = spot.y;
         
         return Card(
           margin: EdgeInsets.only(bottom: 8),
@@ -207,9 +211,11 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
             leading: Icon(Icons.restaurant, color: Color(0xFF6A359C)),
             title: Text(DateFormat('MMMM d, y').format(date)),
             subtitle: Text(_type),
-            trailing: Text(_type == 'Bottle' 
+            trailing: Text(
+              _typeDistribution.entries.first.key == 'Bottle'
               ? '${_bottleAmount}ml' 
-              : '${_leftDuration}m L, ${_rightDuration}m R'),
+              : '${_leftDuration}m L, ${_rightDuration}m R'
+            ),
           ),
         );
       },
@@ -224,96 +230,158 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       builder: (context) => BaseModalSheet(
         title: 'Add Feeding',
         children: [
-          CommonFormWidgets.buildFormCard(
-            title: 'Start Time',
-            child: CommonFormWidgets.buildDateTimePicker(
-              initialDateTime: _startTime,
-              onDateTimeChanged: (newTime) => setState(() => _startTime = newTime),
-            ),
-          ),
-          SizedBox(height: 16),
-          CommonFormWidgets.buildFormCard(
-            title: 'End Time',
-            child: CommonFormWidgets.buildDateTimePicker(
-              initialDateTime: _endTime,
-              onDateTimeChanged: (newTime) => setState(() => _endTime = newTime),
-            ),
-          ),
-          SizedBox(height: 16),
-          CommonFormWidgets.buildFormCard(
-            title: 'Type',
-            child: DropdownButtonFormField<String>(
-              value: _type,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+          Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                CommonFormWidgets.buildFormCard(
+                  title: 'Start Time',
+                  child: CommonFormWidgets.buildDateTimePicker(
+                    initialDateTime: _startTime,
+                    onDateTimeChanged: (newTime) => setState(() => _startTime = newTime),
+                  ),
                 ),
-                // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              items: ['Breast', 'Bottle'].map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() => _type = value!);
-              },
-            ),
-          ),
-          SizedBox(height: 16),
-          if (_type == 'Breast') ...[
-            CommonFormWidgets.buildFormCard(
-              title: 'Left Breast Duration (minutes)',
-              child: TextFormField(
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'End Time',
+                  child: CommonFormWidgets.buildDateTimePicker(
+                    initialDateTime: _endTime,
+                    onDateTimeChanged: (newTime) => setState(() => _endTime = newTime),
+                  ),
                 ),
-                keyboardType: TextInputType.number,
-                onChanged: (value) => _leftDuration = int.tryParse(value),
-              ),
-            ),
-            SizedBox(height: 16),
-            CommonFormWidgets.buildFormCard(
-              title: 'Right Breast Duration (minutes)',
-              child: TextFormField(
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'Type',
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => setState(() => _type = 'Breast'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _type == 'Breast' 
+                                ? Color(0xFF6A359C) 
+                                : Colors.grey[200],
+                            foregroundColor: _type == 'Breast' 
+                                ? Colors.white 
+                                : Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.horizontal(
+                                left: Radius.circular(8),
+                              ),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text('Breast'),
+                        ),
+                      ),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => setState(() => _type = 'Bottle'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _type == 'Bottle' 
+                                ? Color(0xFF6A359C) 
+                                : Colors.grey[200],
+                            foregroundColor: _type == 'Bottle' 
+                                ? Colors.white 
+                                : Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.horizontal(
+                                right: Radius.circular(8),
+                              ),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text('Bottle'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                keyboardType: TextInputType.number,
-                onChanged: (value) => _rightDuration = int.tryParse(value),
-              ),
-            ),
-          ] else
-            CommonFormWidgets.buildFormCard(
-              title: 'Bottle Amount (ml)',
-              child: TextFormField(
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                SizedBox(height: 16),
+                if (_type == 'Breast') ...[
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Left Breast Duration (minutes)',
+                    child: TextFormField(
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) => _leftDuration = int.tryParse(value),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a valid duration';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Right Breast Duration (minutes)',
+                    child: TextFormField(
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) => _rightDuration = int.tryParse(value),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a valid duration';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ] else
+                CommonFormWidgets.buildFormCard(
+                  title: 'Bottle Amount (ml)',
+                  child: TextFormField(
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8) ),
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) => _bottleAmount = int.tryParse(value),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a valid amount';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
-                keyboardType: TextInputType.number,
-                onChanged: (value) => _bottleAmount = int.tryParse(value),
-              ),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'Notes',
+                  child: CommonFormWidgets.buildNotesField(
+                    (value) => _notes = value,
+                  ),
+                ),
+                SizedBox(height: 24),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          _submit();
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF6A359C),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text('Save Feeding'),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          SizedBox(height: 16),
-          CommonFormWidgets.buildFormCard(
-            title: 'Notes',
-            child: CommonFormWidgets.buildNotesField(
-              (value) => _notes = value,
-            ),
-          ),
-          SizedBox(height: 24),
-          CommonFormWidgets.buildSubmitButton(
-            text: 'Save Feeding',
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                _submit();
-                Navigator.pop(context);
-              }
-            },
           ),
         ],
       ),

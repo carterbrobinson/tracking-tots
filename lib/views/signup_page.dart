@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
+import 'package:trackingtots/user_state.dart';
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
 
@@ -20,6 +20,58 @@ class _SignupPageState extends State<SignupPage> {
   bool _passwordVisible = false;
   String _password = '';
   String _confirmPassword = '';
+
+  Future<void> _signUp() async {
+    if (_formKey.currentState!.validate()) {
+      final url = Uri.parse('http://127.0.0.1:5001/register');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': '${_firstNameController.text} ${_lastNameController.text}',
+          'email': _emailController.text,
+          'password': _passwordController.text,
+        }),
+      );
+
+
+      if (response.statusCode == 201) {
+        final loginUrl = Uri.parse('http://127.0.0.1:5001/login');
+        final loginResponse = await http.post(
+          loginUrl,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': _emailController.text,
+            'password': _passwordController.text,
+          }),
+        );
+
+        if (loginResponse.statusCode == 200) {
+          final userData = jsonDecode(loginResponse.body);
+          await UserState.setUserData(
+            userData['user_id'],
+            userData['name'],
+            _emailController.text,
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Sign up successful! Welcome!")),
+          );
+
+          Navigator.pushNamed(context, '/');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Sign up successful! Please login.")),
+          );
+          Navigator.pushNamed(context, '/login');
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Sign up failed. Please try again.")),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -217,31 +269,7 @@ class _SignupPageState extends State<SignupPage> {
                             },
                           ),
                         ),
-                        onFieldSubmitted: (_) async {
-                          if (_formKey.currentState!.validate()) {
-                            final url = Uri.parse('http://127.0.0.1:5001/register');
-                            final response = await http.post(
-                              url,
-                              headers: {'Content-Type': 'application/json'},
-                              body: jsonEncode({
-                                'name': '${_firstNameController.text} ${_lastNameController.text}',
-                                'email': _emailController.text,
-                                'password': _passwordController.text,
-                              }),
-                            );
-
-                            if (response.statusCode == 201) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Sign up successful! Please login.")),
-                              );
-                              Navigator.pushNamed(context, '/login');
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Sign up failed. Please try again.")),
-                              );
-                            }
-                          }
-                        },
+                        onFieldSubmitted: (_) => _signUp(), 
                         obscureText: !_confirmPasswordVisible,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -259,32 +287,7 @@ class _SignupPageState extends State<SignupPage> {
                   ],
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      final url = Uri.parse('http://127.0.0.1:5001/register');
-                      // final url = Uri.parse('https://tracking-tots.onrender.com/register');
-                      final response = await http.post(
-                        url,
-                        headers: {'Content-Type': 'application/json'},
-                        body: jsonEncode({
-                          'name': '${_firstNameController.text} ${_lastNameController.text}',
-                          'email': _emailController.text,
-                          'password': _passwordController.text,
-                        }),
-                      );
-
-                      if (response.statusCode == 201) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Sign up successful! Please login.")),
-                        );
-                        Navigator.pushNamed(context, '/login');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Sign up failed. Please try again.")),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: () => _signUp(),
                   style: ElevatedButton.styleFrom(
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 48),
