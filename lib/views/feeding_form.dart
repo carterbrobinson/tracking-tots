@@ -248,7 +248,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               items: ['Breast', 'Bottle'].map((type) {
                 return DropdownMenuItem(
@@ -268,7 +268,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
               child: TextFormField(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 keyboardType: TextInputType.number,
                 onChanged: (value) => _leftDuration = int.tryParse(value),
@@ -280,7 +280,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
               child: TextFormField(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 keyboardType: TextInputType.number,
                 onChanged: (value) => _rightDuration = int.tryParse(value),
@@ -292,7 +292,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
               child: TextFormField(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  // contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 keyboardType: TextInputType.number,
                 onChanged: (value) => _bottleAmount = int.tryParse(value),

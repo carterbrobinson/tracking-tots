@@ -8,17 +8,17 @@ class CommonFormWidgets {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: EdgeInsets.all(8),
       child: Container(
-        width: 160,
-        padding: EdgeInsets.all(16),
+        width: 150,
+        padding: EdgeInsets.symmetric(horizontal: 2, vertical: 16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 40, color: color),
-            SizedBox(height: 8),
+            SizedBox(height: 6),
             Text(
               title,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 color: Colors.grey[600],
                 fontWeight: FontWeight.bold,
               ),
@@ -27,7 +27,7 @@ class CommonFormWidgets {
             Text(
               value,
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
@@ -46,10 +46,11 @@ class CommonFormWidgets {
       ),
       child: TabBar(
         controller: tabController,
-        indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          color: Color(0xFF6A359C),
-        ),
+        // indicator: BoxDecoration(
+        //   borderRadius: BorderRadius.circular(5),
+        //   borderWidth: fit,
+        //   color: Color(0xFF6A359C),
+        // ),
         labelColor: Colors.white,
         unselectedLabelColor: Color(0xFF6A359C),
         tabs: [
@@ -95,6 +96,9 @@ class CommonFormWidgets {
     return TextFormField(
       decoration: InputDecoration(
         hintText: 'Add any additional notes...',
+        hintStyle: TextStyle(
+          color: Colors.grey[700],
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -112,17 +116,28 @@ class CommonFormWidgets {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Color(0xFF6A359C),
-        padding: EdgeInsets.symmetric(vertical: 16),
+        backgroundColor: Colors.white,
+        // padding: EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
+      child: ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(
+          colors: [
+            Color(0xFF9969C7),
+            Color(0xFF6A359C),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(bounds),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -177,7 +192,7 @@ class CommonFormWidgets {
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF6A359C),
+            color: Colors.white,
           ),
         ),
         IconButton(

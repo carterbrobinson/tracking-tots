@@ -163,7 +163,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
         children: [
           CommonFormWidgets.buildSummaryCard(
             'Daily Sleep', 
-            '${_dailySleepHours.toStringAsFixed(1)}h',  // Changed label from 'Total Sleep' to 'Daily Sleep'
+            '${_dailySleepHours.toStringAsFixed(1)}h',
             Icons.nightlight_round,
             Colors.indigo,
           ),
@@ -300,6 +300,11 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
         final spot = _sleepData[index];
         final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
         final duration = spot.y;
+
+        final startTime = date;
+        final endTime = date.add(Duration(minutes: duration.toInt()));
+
+        final isNap = _isNapTime(date);
         
         return Card(
           elevation: 4,
@@ -312,13 +317,26 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
                 color: Color(0xFF6A359C).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.nightlight_round, color: Color(0xFF6A359C)),
+              child: Icon(isNap ? Icons.wb_sunny : Icons.bedtime, color: Color(0xFF6A359C)),
             ),
-            title: Text(
-              DateFormat('EEEE, MMMM d').format(date),
-              style: TextStyle(fontWeight: FontWeight.bold),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  DateFormat('EEEE, MMMM d').format(_startTime),
+                  style: TextStyle(color: Colors.black),
+                ),
+                Text(
+                  '${DateFormat('hh:mm a').format(startTime)} - ${DateFormat('hh:mm a').format(endTime)}',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
-            subtitle: Text('${(duration / 60).toStringAsFixed(1)} hours'),
+            subtitle: Text(
+              duration > 0 && (duration ~/ 60) > 0
+              ? '${(duration ~/ 60)} hours ${duration % 60} minutes'
+              : '${(duration % 60)} minutes'  
+            ),
             trailing: Icon(Icons.chevron_right),
             onTap: () => _showSleepDetails(date, duration),
           ),
@@ -328,27 +346,100 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
   }
 
   void _showSleepDetails(DateTime date, double duration) {
+    final hours = duration ~/ 60;
+    final minutes = duration % 60;
+    final endTime = date.add(Duration(minutes: duration.toInt()));
+    final isNap = _isNapTime(date);
+
     showModalBottomSheet(
       context: context,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => BaseModalSheet(
-        title: "Sleep Details",
+        title: "Sleep Session Details",
         children: [
           ListTile(
-            leading: Icon(Icons.calendar_today, color: Color(0xFF6A359C)),
-            title: Text('Date'),
-            subtitle: Text(DateFormat('EEEE, MMMM d, y').format(date)),
+            leading: Icon(isNap ? Icons.wb_sunny : Icons.bedtime, color: Colors.white),
+            title: Text(isNap ? 'Nap Start' : 'Sleep Time'),
+            subtitle: Text('${DateFormat('EEEE, MMMM d').format(date)} at ${DateFormat('hh:mm a').format(date)}'),
           ),
           ListTile(
-            leading: Icon(Icons.access_time, color: Color(0xFF6A359C)),
-            title: Text('Duration'),
-            subtitle: Text('${(duration / 60).toStringAsFixed(1)} hours'),
+            leading: Icon(Icons.wb_sunny, color: Colors.white),
+            title: Text('Wake Time'),
+            subtitle: Text('${DateFormat('EEEE, MMMM d').format(endTime)} at ${DateFormat('hh:mm a').format(endTime)}'),
           ),
+          ListTile(
+            leading: Icon(Icons.access_time, color: Colors.white),
+            title: Text('Duration'),
+            subtitle: Text(
+              duration > 0 && hours > 0
+              ? '$hours hours ${minutes.toInt()} minutes'
+              : '${minutes.toInt()} minutes'
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.insights, color: Colors.white),
+            title: Text(isNap ? 'Nap Quality' : 'Sleep Quality'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_getSleepQuality(duration, date)),
+                SizedBox(height: 4),
+                Text(
+                  isNap 
+                    ? 'Ideal nap duration is 20-60 minutes'
+                    : 'Recommended night sleep is 7-9 hours',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_notes?.isNotEmpty ?? false)
+            ListTile(
+              leading: Icon(Icons.notes, color: Colors.white),
+              title: Text('Notes'),
+              subtitle: Text(_notes!),
+            ),
         ],
       ),
     );
+  }
+
+  String _getSleepQuality(double duration, DateTime date) {
+    final hours = duration / 60;
+    final isNap = _isNapTime(date);
+
+    if (isNap) {
+      if (hours < 0.5) {
+        return 'Power Nap 💪';
+      } else if (hours <= 1) {
+        return 'Ideal Nap Duration 👍';
+      } else if (hours <= 1.5) {
+        return 'Long Nap 😴';
+      } else {
+        return 'Very Long Nap ⚠️';
+      }
+    } else {
+      if (hours < 6) {
+        return 'Insufficient Sleep 😟';
+      } else if (hours < 7) {
+        return 'Below Recommended 😐';
+      } else if (hours <= 9) {
+        return 'Optimal Sleep 👍';
+      } else {
+        return 'Extended Sleep 😴';
+      }
+    }
+  }
+
+  bool _isNapTime(DateTime startTime) {
+    final hour = startTime.hour;
+    return hour >= 9 && hour < 20;
   }
 
   void _showAddSleepDialog(BuildContext context) {

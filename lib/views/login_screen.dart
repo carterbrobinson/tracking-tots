@@ -230,7 +230,7 @@ class _LoginPageState extends State<LoginPage> {
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 48),
         backgroundColor: const Color(0xFF6A359C),
       ),
-      child: const Text("Login", style: TextStyle(fontSize: 20)),
+      child: const Text("Login", style: TextStyle(fontSize: 20, color: Colors.white)),
     );
   }
 

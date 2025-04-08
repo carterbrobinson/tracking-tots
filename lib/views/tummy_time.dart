@@ -57,22 +57,13 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
     });
   }
 
-  void _stopTimer() {
-    if (_timer != null) {
-      _timer!.cancel();
-    }
-    setState(() {
-      _endTime = DateTime.now();
-      _isRunning = false;
-    });
-  }
-
   void _pauseTimer() {
     if (_timer != null) {
       _timer!.cancel();
     }
     setState(() {
       _elapsed = _duration;
+      _endTime = DateTime.now();
       _isRunning = false;
     });
   }
@@ -178,37 +169,26 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                         ),
                       ),
                       SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton.icon(
-                            icon: Icon(_isRunning ? Icons.stop : Icons.play_arrow),
-                            label: Text(_isRunning ? 'Stop' : 'Start'),
-                            onPressed: _isRunning ? _stopTimer : _startTimer,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isRunning ? Colors.red : Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
+                      ElevatedButton.icon(
+                        icon: Icon(_isRunning ? Icons.pause : Icons.play_arrow),
+                        label: Text(_isRunning ? 'Stop' : 'Start'),
+                        onPressed: () {
+                          if (!_isRunning && _startTime == null) {
+                            _startTimer();
+                          } else if (_isRunning) {
+                            _pauseTimer();
+                          } else {
+                            _resumeTimer();
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isRunning ? Colors.red : Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          ElevatedButton.icon(
-                            icon: Icon(_isRunning ? Icons.pause : Icons.play_arrow,
-                            color: _isRunning ? Color(0xFF6A359C) : Colors.white),
-                            label: Text(_isRunning ? 'Pause' : 'Resume'),
-                            onPressed: _isRunning ? _pauseTimer : _resumeTimer,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isRunning ? Color(0xFF6A359C) : Color(0xFF6A359C),
-                              foregroundColor: _isRunning? Color(0xFF6A359C) : Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),

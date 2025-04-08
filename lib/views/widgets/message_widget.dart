@@ -28,23 +28,6 @@ class MessageWidget extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Text(text),
           ),
-          if(fromAi)...[
-            SizedBox(height: 12),
-            SizedBox(
-              width: MediaQuery.of(context).size.width * .8,
-              child: Row(
-                children: [
-                  Icon(Icons.thumb_up_alt_outlined, size: 22, color: Colors.grey,),
-                  SizedBox(width: 10,),
-                  Icon(Icons.thumb_down_alt_outlined, size: 22, color: Colors.grey,),
-                  Spacer(),
-                  Icon(Icons.copy_outlined, size: 16, color: Colors.grey,),
-                  SizedBox(width: 10,),
-                  Text('copy', style: textTheme.bodyMedium?.copyWith(color: Colors.grey),)
-                ],
-              ),
-            )
-          ]
         ],
       ),
     );

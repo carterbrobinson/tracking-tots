@@ -62,7 +62,7 @@ class _TodoFormState extends State<TodoForm> {
   }
 
   Widget _buildTodoSummaryCards() {
-    return Container(
+    return SizedBox(
       height: 160,
       child: ListView(
         scrollDirection: Axis.horizontal,
@@ -268,6 +268,7 @@ class _TodoFormState extends State<TodoForm> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: ListTile(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           leading: Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
@@ -287,27 +288,32 @@ class _TodoFormState extends State<TodoForm> {
                                 ? TextDecoration.lineThrough 
                                 : TextDecoration.none,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
                           ),
                           subtitle: Text(
                             DateFormat('EEE, MMM d - h:mm a').format(todoDate),
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  todo['completed'] == true 
-                                    ? Icons.check_circle 
-                                    : Icons.radio_button_unchecked,
-                                  color: Colors.green,
+                          trailing: SizedBox(
+                            width: 96,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    todo['completed'] == true 
+                                      ? Icons.check_circle 
+                                      : Icons.radio_button_unchecked,
+                                    color: Colors.green,
+                                  ),
+                                  onPressed: () => _toggleTodoStatus(todo['id']),
                                 ),
-                                onPressed: () => _toggleTodoStatus(todo['id']),
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _deleteTodos(todo['id']),
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _deleteTodos(todo['id']),            
                               ),
                             ],
+                          ),
                           ),
                         ),
                       );

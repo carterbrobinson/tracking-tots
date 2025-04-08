@@ -175,65 +175,71 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.purple[50],
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      int crossAxisCount = constraints.maxWidth ~/ 200;
-                      crossAxisCount = crossAxisCount.clamp(1, 4);
-                      
-                      return GridView.count(
-                        shrinkWrap: true,
-                        crossAxisCount: crossAxisCount,
-                        childAspectRatio: 1.2,
-                        crossAxisSpacing: 15,
-                        mainAxisSpacing: 15,
-                        children: [
-                          trackerCard(context, 'Feeding', 'assets/feeding-purple.png', '/feeding'),
-                          trackerCard(context, 'ChatBot', 'assets/chatbot-purple.png', '/chatbot'),
-                          trackerCard(context, 'Sleeping', 'assets/sleep-purple.png', '/sleeping'),
-                          trackerCard(context, 'Diaper', 'assets/diaper-purple.png', '/diaper'),
-                          trackerCard(context, 'Tummy Time', 'assets/tummy-time-purple.png', '/tummy'),
-                          trackerCard(context, 'Todo', 'assets/todo-purple.png', '/todo'),
-                        ],
-                      );
-                    },
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        int crossAxisCount = constraints.maxWidth ~/ 200;
+                        crossAxisCount = crossAxisCount.clamp(1, 4);
+                        
+                        return GridView.count(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          crossAxisCount: crossAxisCount,
+                          childAspectRatio: 1.2,
+                          crossAxisSpacing: 15,
+                          mainAxisSpacing: 15,
+                          children: [
+                            trackerCard(context, 'Feeding', 'assets/feeding-purple.png', '/feeding'),
+                            trackerCard(context, 'ChatBot', 'assets/chatbot-purple.png', '/chatbot'),
+                            trackerCard(context, 'Sleeping', 'assets/sleep-purple.png', '/sleeping'),
+                            trackerCard(context, 'Diaper', 'assets/diaper-purple.png', '/diaper'),
+                            trackerCard(context, 'Tummy Time', 'assets/tummy-time-purple.png', '/tummy'),
+                            trackerCard(context, 'Todo', 'assets/todo-purple.png', '/todo'),
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _activities.length,
-                    padding: EdgeInsets.all(16),
-                    itemBuilder: (context, index) {
-                      final activity = _activities[index];
-                      return Card(
-                        margin: EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(_getIconForType(activity['type'])),
-                              Text(DateFormat('MMM. d - h:mm a').format(DateTime.parse(activity['time'])), style: TextStyle(fontSize: 12),),
-                            ],
+                  Container(
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: _activities.length,
+                      padding: EdgeInsets.all(16),
+                      itemBuilder: (context, index) {
+                        final activity = _activities[index];
+                        return Card(
+                          margin: EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(_getIconForType(activity['type'])),
+                                Text(DateFormat('MMM. d - h:mm a').format(DateTime.parse(activity['time'])), style: TextStyle(fontSize: 12),),
+                              ],
+                            ),
+                            title: Text(activity['type']),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(activity['details']),
+                                if (activity['notes'] != null)
+                                  Text(activity['notes'], style: TextStyle(fontStyle: FontStyle.italic)),
+                              ],
+                            ),
                           ),
-                          title: Text(activity['type']),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(activity['details']),
-                              if (activity['notes'] != null)
-                                Text(activity['notes'], style: TextStyle(fontStyle: FontStyle.italic)),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+          ),
     );
   }
 

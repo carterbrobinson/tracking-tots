@@ -290,7 +290,7 @@ class _SignupPageState extends State<SignupPage> {
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 48),
                     backgroundColor: Color(0xFF6A359C),
                   ),
-                  child: const Text("Sign Up", style: TextStyle(fontSize: 20)),
+                  child: const Text("Sign Up", style: TextStyle(fontSize: 20, color: Colors.white)),
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
