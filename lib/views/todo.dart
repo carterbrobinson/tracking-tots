@@ -6,6 +6,8 @@ import 'package:trackingtots/views/widgets/top_navigation_bar.dart';
 import 'package:trackingtots/user_state.dart';
 import 'package:trackingtots/views/widgets/form_builder.dart';
 import 'package:trackingtots/views/widgets/modal_sheet.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/cupertino.dart';
 
 class TodoForm extends StatefulWidget {
   @override
@@ -20,17 +22,72 @@ class _TodoFormState extends State<TodoForm> {
   int _todayTasks = 0;
   int _completedTasks = 0;
   int _pendingTasks = 0;
+  DateTime? _reminderTime;
+  int _selectedReminderOffsetIndex = 1;
+  final List<int> _reminderOffsets = [0, 10, 20, 30, 60];
+  final List<String> _reminderOptions = [
+    "At time of task",
+    "10 minutes before",
+    "20 minutes before",
+    "30 minutes before",
+    "1 hour before",
+  ];
+  bool _isSettingReminder = false;
 
   @override
   void initState() {
     super.initState();
     _fetchTodos();
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+      if (notification != null && android != null) {
+        showDialog(
+          context: context,
+          builder: (_) {
+            return AlertDialog(
+              title: Text(notification.title ?? 'Reminder'),
+              content: Text(notification.body ?? 'You have a task due soon!'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('OK'),
+                )
+              ]
+            );
+          },
+        );
+      }
+    });
+  }
+
+  void _showReminderOffsetPicker() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (_) => Container(
+        height: 250,
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        child: CupertinoPicker(
+          itemExtent: 32,
+          scrollController: FixedExtentScrollController(initialItem: _selectedReminderOffsetIndex),
+          onSelectedItemChanged: (index) {
+            setState(() {
+              _selectedReminderOffsetIndex = index;
+              _reminderTime = _time.subtract(Duration(minutes: _reminderOffsets[index]));
+            });
+          },
+          children: _reminderOptions.map((option) => Text(option)).toList(),
+        ),
+      ),
+    );
   }
 
   Future<void> _fetchTodos() async {
     if (UserState.userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please log in to view your todos.'))
+        SnackBar(content: Text('Please log in to view your to-dos.'))
       );
       Navigator.pushReplacementNamed(context, '/login');
       return;
@@ -91,12 +148,15 @@ class _TodoFormState extends State<TodoForm> {
   }
 
   void _showAddTodoDialog(BuildContext context) {
+    setState(() {
+      _reminderTime = _time.subtract(Duration(minutes: _reminderOffsets[_selectedReminderOffsetIndex]));
+    });
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => BaseModalSheet(
-        title: 'Add Todo',
+        title: 'Add To-Do',
         children: [
           Form(
             key: _formKey,
@@ -107,7 +167,12 @@ class _TodoFormState extends State<TodoForm> {
                   child: CommonFormWidgets.buildDateTimePickerForward(
                     initialDateTime: _time,
                     minimumDate: DateTime.now(),
-                    onDateTimeChanged: (newTime) => setState(() => _time = newTime),
+                    onDateTimeChanged: (newTime) {
+                      setState(() {
+                        _time = newTime;
+                        _reminderTime = _time.subtract(Duration(minutes: _reminderOffsets[_selectedReminderOffsetIndex]));
+                      });
+                    },
                   ),
                 ),
                 SizedBox(height: 16),
@@ -115,7 +180,7 @@ class _TodoFormState extends State<TodoForm> {
                   title: 'Task Description',
                   child: TextFormField(
                     decoration: InputDecoration(
-                      hintText: 'Enter your todo',
+                      hintText: 'Enter your task',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -125,6 +190,61 @@ class _TodoFormState extends State<TodoForm> {
                     onChanged: (value) => _notes = value,
                     validator: (value) => value == null || value.isEmpty ? 'Enter a task description' : null,
                   ),
+                ),
+                ElevatedButton(
+                  onPressed: _showReminderOffsetPicker,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _reminderTime != null ? Colors.deepPurple : Colors.grey[200],
+                    foregroundColor: _reminderTime != null ? Colors.white : Colors.grey[800],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_reminderTime != null ? Icons.notifications_active : Icons.notifications_none),
+                      SizedBox(width: 8),
+                      Text(_reminderTime != null ? 'Reminder Set' : 'Set Reminder'),
+                    ],
+                  ),
+                ),
+                if (_reminderTime != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Reminder: ${_reminderOptions[_selectedReminderOffsetIndex]}',
+                          style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '(${DateFormat('EEE, MMM d - h:mm a').format(_reminderTime!)})',
+                          style: TextStyle(color: Colors.deepPurple),
+                        ),
+                      ],
+                    ),
+                  ),
+                ElevatedButton(
+                  onPressed: () {
+                    // Set reminder to 30 seconds from now
+                    setState(() {
+                      _time = DateTime.now().add(Duration(minutes: 2));
+                      _reminderTime = DateTime.now().add(Duration(seconds: 30));
+                      _selectedReminderOffsetIndex = 0; // "At time of task"
+                    });
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Reminder set to 30 seconds from now"))
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text("Set Test Reminder (30s)"),
                 ),
                 SizedBox(height: 24),
                 CommonFormWidgets.buildSubmitButton(
@@ -152,30 +272,82 @@ class _TodoFormState extends State<TodoForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
+    
+    setState(() {
+      _isSettingReminder = true;
+    });
+
     if (_formKey.currentState!.validate()) {
       final data = {
         'user_id': UserState.userId,
-        'time': _time.toIso8601String(),
+        'time': _time.toUtc().toIso8601String(),
         'notes': _notes,
+        'reminder_time': _reminderTime?.toUtc().toIso8601String(),
       };
-      final response = await http.post(
-        Uri.parse('http://127.0.0.1:5001/todo/${UserState.userId}'),
-        // Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(data),
-      );
-      if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Todo added successfully!')),
+
+      try {
+        final response = await http.post(
+          Uri.parse('http://127.0.0.1:5001/todo/${UserState.userId}'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(data),
         );
-        _formKey.currentState!.reset();
-        _notes = '';
-        _fetchTodos();
-      } else {
+        setState(() {
+          _isSettingReminder = false;
+        });
+
+        if (response.statusCode == 201) {
+          String message = 'Todo added successfully!';
+          if (_reminderTime != null) {
+            message += ' Reminder set for ${DateFormat('h:mm a').format(_reminderTime!)}';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message), 
+              duration: Duration(seconds: 5), 
+              action: _reminderTime != null ? SnackBarAction(
+                label: 'TEST NOW', 
+                onPressed: () {
+                  _testReminderNotification();
+                },
+              ) : null,
+            ),
+          );
+          _formKey.currentState!.reset();
+          _notes = '';
+          _fetchTodos();
+          _reminderTime = null;
+          _selectedReminderOffsetIndex = 1;
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error adding Todo: ${response.statusCode}')),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isSettingReminder = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error adding Todo.')),
+          SnackBar(content: Text('Error adding Todo: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _testReminderNotification() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:5001/test-reminders/${UserState.userId}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test notification triggered')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending test notification')),
+      );
     }
   }
 
@@ -224,10 +396,85 @@ class _TodoFormState extends State<TodoForm> {
     }
   }
 
+  Widget buildReminderIndicator(Map<String, dynamic> todo) {
+    if (todo['reminder_time'] == null) {
+      return SizedBox.shrink();
+    }
+    
+    final reminderTime = DateTime.parse(todo['reminder_time']);
+    final now = DateTime.now();
+    final difference = reminderTime.difference(now);
+    
+    // For reminders in the past or very soon
+    if (difference.inMinutes <= 5) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Due ${difference.inMinutes <= 0 ? 'now' : 'in ${difference.inMinutes}m'}',
+          style: TextStyle(color: Colors.white, fontSize: 10),
+        ),
+      );
+    }
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'Reminder at ${DateFormat('h:mm a').format(reminderTime)}',
+        style: TextStyle(fontSize: 10),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: TopNavigationBar(title: 'Todo List'),
+      appBar: AppBar(
+        title: Text('To-Do List'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.notifications),
+            onPressed: () async {
+              if (UserState.userId == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Please log in first')),
+                );
+                return;
+              }
+              
+              try {
+                final response = await http.post(
+                  Uri.parse('http://127.0.0.1:5001/test-user-notification/${UserState.userId}'),
+                  headers: {'Content-Type': 'application/json'},
+                );
+                
+                if (response.statusCode == 200) {
+                  final data = jsonDecode(response.body);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(data['message'])),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to send test notification')),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            },
+            tooltip: 'Test Notification',
+          ),
+        ],
+      ),
       backgroundColor: Colors.purple[50],
       body: CustomScrollView(
         slivers: <Widget>[
@@ -248,7 +495,7 @@ class _TodoFormState extends State<TodoForm> {
               ? SliverToBoxAdapter(
                   child: Center(
                     child: Text(
-                      'No todos yet',
+                      'No tasks yet',
                       style: TextStyle(
                         fontSize: 24,
                         color: Colors.grey,
@@ -291,8 +538,13 @@ class _TodoFormState extends State<TodoForm> {
                             overflow: TextOverflow.ellipsis,
                             maxLines: 2,
                           ),
-                          subtitle: Text(
-                            DateFormat('EEE, MMM d - h:mm a').format(todoDate),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(DateFormat('EEE, MMM d - h:mm a').format(todoDate)),
+                              SizedBox(height: 4),
+                              buildReminderIndicator(todo),
+                            ],
                           ),
                           trailing: SizedBox(
                             width: 96,

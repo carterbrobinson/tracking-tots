@@ -69,7 +69,18 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           child: AppBar(
-            title: Text('Tracking Tots'),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children:[
+                Image.asset(
+                  "assets/tracking-tots-white.png",
+                  width: 40,
+                  height: 40,
+                ),
+                SizedBox(width: 10),
+                Text("Tracking Tots", style: TextStyle(color: Colors.white)),
+              ],
+            ),
             backgroundColor: Colors.transparent,
             automaticallyImplyLeading: false,
             elevation: 0,
@@ -135,7 +146,7 @@ class _HomePageState extends State<HomePage> {
                     value: 'todo',
                     child: ListTile(
                       leading: Icon(Icons.checklist, color: Color(0xFF6A359C)),
-                      title: Text('Todo'),
+                      title: Text('To-Do List'),
                     ),
                   ),
                   PopupMenuItem(
@@ -198,7 +209,7 @@ class _HomePageState extends State<HomePage> {
                             trackerCard(context, 'Sleeping', 'assets/sleep-purple.png', '/sleeping'),
                             trackerCard(context, 'Diaper', 'assets/diaper-purple.png', '/diaper'),
                             trackerCard(context, 'Tummy Time', 'assets/tummy-time-purple.png', '/tummy'),
-                            trackerCard(context, 'Todo', 'assets/todo-purple.png', '/todo'),
+                            trackerCard(context, 'To-Do List', 'assets/todo-purple.png', '/todo'),
                           ],
                         );
                       },

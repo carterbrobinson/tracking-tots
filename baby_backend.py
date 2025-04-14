@@ -6,14 +6,29 @@ import datetime
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+from firebase_admin import credentials, messaging
+import firebase_admin
+from apscheduler.schedulers.background import BackgroundScheduler
+import json
+import requests
+import threading
+
 
 load_dotenv()
+
+cred = credentials.Certificate('firebase_credentials.json')
+firebase_admin.initialize_app(cred)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
 
+# #in memory data storage simulate database
+# todos = []
+# fcm_tokens = []
+# scheduler = BackgroundScheduler()
+# scheduler.start()
 # SQLite Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/baby_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -66,6 +81,7 @@ class Todo(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     time = db.Column(db.DateTime, nullable=False)
     notes = db.Column(db.Text, nullable=True)
+    reminder_time = db.Column(db.DateTime, nullable=True)
     completed = db.Column(db.Boolean, default=False, nullable=False)
 
 class Reminder(db.Model):
@@ -75,7 +91,138 @@ class Reminder(db.Model):
     reminder_time = db.Column(db.DateTime, nullable=False)
     notified = db.Column(db.Boolean, default=False)
 
+class FCMToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token = db.Column(db.String(255), nullable=False)
+    platform = db.Column(db.String(10), nullable=False)
+
+
+def send_notification(token, title, body):
+    try:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title = title,
+                body = body       
+            ),
+            token = token,
+        )
+        response = messaging.send(message)
+        print(f"Notification sent to token: {token}. Response: {response}")
+    except Exception as e:
+        print(f"Error sending notification: {e}")
+        
+def send_due_reminders():
+    with app.app_context():
+        now = datetime.datetime.now(datetime.timezone.utc)
+        in_one_minute = now + datetime.timedelta(minutes=2)
+        
+        print(f"[DEBUG] Checking reminders at {now.isoformat()}")
+        
+        # Improve the todo filtering logic to ensure proper timezone handling
+        due_todos = Todo.query.filter(
+            Todo.reminder_time != None,
+            Todo.completed == False
+        ).all()
+        
+        # Add more detailed logging about what was found
+        print(f"[DEBUG] Found {len(due_todos)} todos with reminders")
+        
+        # Manual filtering with detailed timezone comparison logging
+        filtered_todos = []
+        for todo in due_todos:
+            todo_time_utc = todo.reminder_time.replace(tzinfo=datetime.timezone.utc)
+            is_due = todo_time_utc >= now and todo_time_utc <= in_one_minute
+            print(f"[DEBUG] Todo ID {todo.id} | Time: {todo_time_utc.isoformat()} | Is due: {is_due}")
+            if is_due:
+                filtered_todos.append(todo)
+
+        print(f"[DEBUG] Found {len(filtered_todos)} due todos in the next minute")
+        
+        # Process the filtered todos
+        for todo in filtered_todos:
+            tokens = FCMToken.query.filter_by(user_id=todo.user_id).all()
+            print(f"[DEBUG] Found {len(tokens)} tokens for user {todo.user_id}")
+            
+            if not tokens:
+                print(f"[WARNING] No FCM tokens found for user {todo.user_id}")
+                continue
+                
+            for token_entry in tokens:
+                try:
+                    message = messaging.Message(
+                        token=token_entry.token,
+                        notification=messaging.Notification(
+                            title="Task Reminder",
+                            body=f"Don't forget: {todo.notes}"
+                        ),
+                        # Add data payload to allow app to handle the notification
+                        data={
+                            "type": "todo",
+                            "id": str(todo.id),
+                            "notes": todo.notes
+                        }
+                    )
+                    response = messaging.send(message)
+                    print(f"[✅] Reminder sent for Todo ID {todo.id}: {response}")
+                except Exception as e:
+                    print(f"[❌] Error sending reminder for Todo ID {todo.id}: {e}")
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(send_due_reminders, 'interval', seconds=30)
+scheduler.start()
+
 # API Endpoints
+
+@app.route('/debug-tokens/<int:user_id>', methods=['GET'])
+def debug_tokens(user_id):
+    tokens = FCMToken.query.filter_by(user_id=user_id).all()
+    return jsonify([{"token": t.token, "platform": t.platform} for t in tokens])
+
+@app.route('/delete-token', methods=['POST'])
+def delete_token():
+    data = request.json
+    token = data.get('token')
+    if not token:
+        return jsonify({"error": "Missing token"}), 400
+
+    deleted = FCMToken.query.filter_by(token=token).delete()
+    db.session.commit()
+    return jsonify({"message": f"Deleted {deleted} token(s)"}), 200
+
+
+@app.route('/test-reminders/<int:user_id>', methods=['POST'])
+def test_reminders(user_id):
+    # Find all FCM tokens for this user
+    tokens = FCMToken.query.filter_by(user_id=user_id).all()
+    
+    if not tokens:
+        return jsonify({"message": "No FCM tokens found for this user"}), 404
+    
+    # Send a test notification to all user's devices
+    success_count = 0
+    for token_entry in tokens:
+        try:
+            message = messaging.Message(
+                token=token_entry.token,
+                notification=messaging.Notification(
+                    title="Test Reminder",
+                    body="This is a test reminder notification"
+                ),
+                data={
+                    "type": "test",
+                    "id": "test-123"
+                }
+            )
+            response = messaging.send(message)
+            print(f"[✅] Test reminder sent to user {user_id} token: {token_entry.token}")
+            success_count += 1
+        except Exception as e:
+            print(f"[❌] Error sending test reminder: {e}")
+    
+    return jsonify({
+        "message": f"Test notifications sent to {success_count} of {len(tokens)} devices"
+    }), 200
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -130,6 +277,9 @@ def get_feeding_data(user_id):
         "type": f.type,
         "start_time": f.start_time.isoformat(),
         "end_time": f.end_time.isoformat(),
+        "left_breast_duration": f.left_breast_duration,
+        "right_breast_duration": f.right_breast_duration,
+        "bottle_amount": f.bottle_amount,
         "details": f"Type: {f.type}, Duration: {(f.end_time - f.start_time).total_seconds() / 60:.0f} minutes",
         "notes": f.notes
     } for f in feedings])
@@ -195,10 +345,21 @@ def add_diaper_change(user_id):
 @app.route('/todo/<int:user_id>', methods=['POST'])
 def add_task(user_id):
     data = request.json
+    reminder_time = data.get('reminder_time')
+    
+    # Print the reminder time for debugging
+    if reminder_time:
+        print(f"[DEBUG] New todo with reminder at: {reminder_time}")
+        parsed_time = datetime.datetime.fromisoformat(reminder_time)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        seconds_until_reminder = (parsed_time.replace(tzinfo=datetime.timezone.utc) - now).total_seconds()
+        print(f"[DEBUG] Seconds until reminder: {seconds_until_reminder}")
+    
     new_task = Todo(
         user_id=user_id,
         time=datetime.datetime.fromisoformat(data['time']),
-        notes=data.get('notes')
+        notes=data.get('notes'),
+        reminder_time=datetime.datetime.fromisoformat(reminder_time) if reminder_time else None
     )
     db.session.add(new_task)
     db.session.commit()
@@ -211,7 +372,8 @@ def get_todo_list(user_id):
         "id": t.id,
         "time": t.time.isoformat(),
         "notes": t.notes,
-        "completed": t.completed
+        "completed": t.completed,
+        "reminder_time": t.reminder_time.isoformat() if t.reminder_time else None
     } for t in todos])
 
 @app.route('/todo/<int:user_id>', methods=['DELETE'])
@@ -329,6 +491,54 @@ def get_response():
 def index():
     return "🎉 Baby Tracker API is Live!"
 
+
+@app.route('/register-fcm-token', methods=['POST'])
+def register_fcm_token():
+    data = request.json
+    user_id = data.get('user_id')
+    token = data.get('token')
+    platform = data.get('platform', 'web')
+
+    if not user_id or not token:
+        return jsonify({"message": "User ID and token are required"}), 400
+
+    existing_token = FCMToken.query.filter_by(token=token).first()
+    if not existing_token:
+        db.session.add(FCMToken(user_id=user_id, token=token, platform=platform))
+        db.session.commit()
+
+    print(f"[DEBUG] FCM token registered for user {user_id}: {token}")
+    return jsonify({"message": "FCM token registered successfully"}), 200
+
+
+@app.route('/check-reminders', methods=['POST'])
+def check_reminders():
+    now = datetime.datetime.now(datetime.timezone.utc)
+    reminders = Reminder.query.filter(Reminder.reminder_time <= now, Reminder.notified == False).all()
+
+    print(f"[DEBUG] Found {len(reminders)} due reminder objects")
+
+    for r in reminders:
+        tokens = FCMToken.query.filter_by(user_id=r.user_id).all()
+        for token in tokens:
+            try:
+                message = messaging.Message(
+                    token=token.token,
+                    notification=messaging.Notification(
+                        title="Reminder",
+                        body=f"Category: {r.category} at {r.reminder_time}"
+                    )
+                )
+                response = messaging.send(message)
+                print(f"[✅] Reminder sent for reminder ID {r.id} to {token.token}: {response}")
+            except Exception as e:
+                print(f"[❌] Reminder send failed: {e}")
+        r.notified = True
+    db.session.commit()
+
+    return jsonify({"message": f"Processed {len(reminders)} reminders"}), 200
+
+        
 @app.route('/homepage/<int:user_id>', methods=['GET'])
 def get_homepage_data(user_id):
     try:
@@ -387,6 +597,34 @@ def get_homepage_data(user_id):
             "success": False,
             "message": "Error fetching homepage data"
         }), 500
+
+@app.route('/test-user-notification/<int:user_id>', methods=['POST'])
+def test_user_notification(user_id):
+    tokens = FCMToken.query.filter_by(user_id=user_id).all()
+    
+    if not tokens:
+        return jsonify({"error": f"No FCM tokens found for user {user_id}"}), 404
+    
+    success_count = 0
+    for token in tokens:
+        try:
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title="Test Notification",
+                    body="This is a test notification from Tracking Tots."
+                ),
+                token=token.token,
+            )
+            response = messaging.send(message)
+            print(f"[✅] Test notification sent to user {user_id}: {response}")
+            success_count += 1
+        except Exception as e:
+            print(f"[❌] Error sending test notification: {e}")
+    
+    return jsonify({
+        "message": f"Test notifications sent to {success_count} out of {len(tokens)} devices",
+        "tokens": [t.token for t in tokens]
+    }), 200
 
 if __name__ == '__main__':
     with app.app_context():

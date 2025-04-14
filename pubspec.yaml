@@ -49,6 +49,10 @@ dependencies:
   firebase_core: ^2.27.1
   firebase_auth: ^4.17.9
   cloud_firestore: ^4.15.9
+  firebase_messaging: ^14.9.4
+
+  flutter_local_notifications: ^16.3.2
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -74,18 +78,14 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/rattle.png
-    - assets/chatbot.png
-    - assets/sleeping.png
-    - assets/tummytime.png
-    - assets/feeding.png
-    - assets/diaper.png
-    - assets/todo.png
     - assets/feeding-purple.png
     - assets/chatbot-purple.png
     - assets/sleep-purple.png
     - assets/tummy-time-purple.png
     - assets/diaper-purple.png
     - assets/todo-purple.png
+    - assets/tracking-tots-white.png
+    - assets/tracking-tots-purple.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -29,6 +29,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
     'Breast': 0,
     'Bottle': 0,
   };
+  List<dynamic> _feedingDetails = [];
 
   @override
   void initState() {
@@ -73,7 +74,7 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
         _typeDistribution[item['type']] = (_typeDistribution[item['type']] ?? 0) + 1;
         double duration = 0;
         if (item['type'] == 'Breast') {
-          duration = (item['left_breast_duration'] ?? 0 + item['right_breast_duration'] ?? 0).toDouble();
+          duration = ((item['left_breast_duration'] ?? 0) + (item['right_breast_duration'] ?? 0)).toDouble();
         } else if (item['type'] == 'Bottle') {
           duration = item['bottle_amount']?.toDouble() ?? 0;
         }
@@ -84,13 +85,15 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       final firstFeeding = data.isNotEmpty ? DateTime.parse(data.first['start_time']) : DateTime.now();
       final daysDifference = DateTime.now().difference(firstFeeding).inDays + 1;
       _averageFeedingsPerDay = _totalFeedings / daysDifference;
+
+      _feedingDetails = data;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: TopNavigationBar(title: 'Feeding Tracking'),
+      appBar: TopNavigationBar(title: 'Feeding Tracker'),
       backgroundColor: Colors.purple[50],
       body: CustomScrollView(
         slivers: [
@@ -197,25 +200,42 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
   }
 
   Widget _buildFeedingList() {
+    if (_feedingDetails.isEmpty) {
+      return Center(
+        child: Text(
+          'No feeding data recorded yet',
+          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: _feedingData.length,
+      itemCount: _feedingDetails.length,
       itemBuilder: (context, index) {
-        final spot = _feedingData[index];
-        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-        final duration = spot.y;
+        // Get the feeding details directly
+        final item = _feedingDetails[index];
+        final time = DateTime.parse(item['start_time']);
+        final feedingType = item['type'] ?? 'Unknown';
+        
+        // Build the trailing text based on the actual feeding data
+        String trailingText;
+        if (feedingType == 'Bottle') {
+          trailingText = '${item['bottle_amount'] ?? 0}ml';
+        } else {
+          trailingText = '${item['left_breast_duration'] ?? 0}m L, ${item['right_breast_duration'] ?? 0}m R';
+        }
         
         return Card(
           margin: EdgeInsets.only(bottom: 8),
           child: ListTile(
-            leading: Icon(Icons.restaurant, color: Color(0xFF6A359C)),
-            title: Text(DateFormat('MMMM d, y').format(date)),
-            subtitle: Text(_type),
-            trailing: Text(
-              _typeDistribution.entries.first.key == 'Bottle'
-              ? '${_bottleAmount}ml' 
-              : '${_leftDuration}m L, ${_rightDuration}m R'
+            leading: Icon(
+              feedingType == 'Bottle' ? Icons.baby_changing_station : Icons.child_care,
+              color: Color(0xFF6A359C)
             ),
+            title: Text(DateFormat('MMMM d, y').format(time)),
+            subtitle: Text(feedingType),
+            trailing: Text(trailingText),
           ),
         );
       },
@@ -223,93 +243,141 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
   }
 
   void _showAddFeedingDialog(BuildContext context) {
+    // Create a local variable to track the type inside the modal
+    String localType = _type;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => BaseModalSheet(
-        title: 'Add Feeding',
-        children: [
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                CommonFormWidgets.buildFormCard(
-                  title: 'Start Time',
-                  child: CommonFormWidgets.buildDateTimePicker(
-                    initialDateTime: _startTime,
-                    onDateTimeChanged: (newTime) => setState(() => _startTime = newTime),
-                  ),
-                ),
-                SizedBox(height: 16),
-                CommonFormWidgets.buildFormCard(
-                  title: 'End Time',
-                  child: CommonFormWidgets.buildDateTimePicker(
-                    initialDateTime: _endTime,
-                    onDateTimeChanged: (newTime) => setState(() => _endTime = newTime),
-                  ),
-                ),
-                SizedBox(height: 16),
-                CommonFormWidgets.buildFormCard(
-                  title: 'Type',
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => setState(() => _type = 'Breast'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _type == 'Breast' 
-                                ? Color(0xFF6A359C) 
-                                : Colors.grey[200],
-                            foregroundColor: _type == 'Breast' 
-                                ? Colors.white 
-                                : Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.horizontal(
-                                left: Radius.circular(8),
-                              ),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: Text('Breast'),
-                        ),
-                      ),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => setState(() => _type = 'Bottle'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _type == 'Bottle' 
-                                ? Color(0xFF6A359C) 
-                                : Colors.grey[200],
-                            foregroundColor: _type == 'Bottle' 
-                                ? Colors.white 
-                                : Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.horizontal(
-                                right: Radius.circular(8),
-                              ),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: Text('Bottle'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16),
-                if (_type == 'Breast') ...[
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => BaseModalSheet(
+          title: 'Add Feeding',
+          children: [
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
                   CommonFormWidgets.buildFormCard(
-                    title: 'Left Breast Duration (minutes)',
+                    title: 'Start Time',
+                    child: CommonFormWidgets.buildDateTimePicker(
+                      initialDateTime: _startTime,
+                      onDateTimeChanged: (newTime) => setModalState(() => _startTime = newTime),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'End Time',
+                    child: CommonFormWidgets.buildDateTimePicker(
+                      initialDateTime: _endTime,
+                      onDateTimeChanged: (newTime) => setModalState(() => _endTime = newTime),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Type',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                localType = 'Breast';
+                                _type = 'Breast';
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: localType == 'Breast' 
+                                  ? Color(0xFF6A359C) 
+                                  : Colors.grey[200],
+                              foregroundColor: localType == 'Breast' 
+                                  ? Colors.white 
+                                  : Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.horizontal(
+                                  left: Radius.circular(8),
+                                ),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: Text('Breast'),
+                          ),
+                        ),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                localType = 'Bottle';
+                                _type = 'Bottle';
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: localType == 'Bottle' 
+                                  ? Color(0xFF6A359C) 
+                                  : Colors.grey[200],
+                              foregroundColor: localType == 'Bottle' 
+                                  ? Colors.white 
+                                  : Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.horizontal(
+                                  right: Radius.circular(8),
+                                ),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: Text('Bottle'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  if (localType == 'Breast') ...[
+                    CommonFormWidgets.buildFormCard(
+                      title: 'Left Breast Duration (minutes)',
+                      child: TextFormField(
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) => _leftDuration = int.tryParse(value),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a valid duration';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    CommonFormWidgets.buildFormCard(
+                      title: 'Right Breast Duration (minutes)',
+                      child: TextFormField(
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) => _rightDuration = int.tryParse(value),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a valid duration';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ] else
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Bottle Amount (ml)',
                     child: TextFormField(
                       decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8) ),
                       ),
                       keyboardType: TextInputType.number,
-                      onChanged: (value) => _leftDuration = int.tryParse(value),
+                      onChanged: (value) => _bottleAmount = int.tryParse(value),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter a valid duration';
+                          return 'Please enter a valid amount';
                         }
                         return null;
                       },
@@ -317,73 +385,27 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
                   ),
                   SizedBox(height: 16),
                   CommonFormWidgets.buildFormCard(
-                    title: 'Right Breast Duration (minutes)',
-                    child: TextFormField(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) => _rightDuration = int.tryParse(value),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a valid duration';
-                        }
-                        return null;
-                      },
+                    title: 'Notes',
+                    child: CommonFormWidgets.buildNotesField(
+                      (value) => _notes = value,
                     ),
                   ),
-                ] else
-                CommonFormWidgets.buildFormCard(
-                  title: 'Bottle Amount (ml)',
-                  child: TextFormField(
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8) ),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) => _bottleAmount = int.tryParse(value),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a valid amount';
+                  SizedBox(height: 24),
+                  CommonFormWidgets.buildSubmitButton(
+                    text: 'Save Feeding',
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        _submit();
+                        Navigator.pop(context);
                       }
-                      return null;
                     },
                   ),
-                ),
-                SizedBox(height: 16),
-                CommonFormWidgets.buildFormCard(
-                  title: 'Notes',
-                  child: CommonFormWidgets.buildNotesField(
-                    (value) => _notes = value,
-                  ),
-                ),
-                SizedBox(height: 24),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          _submit();
-                          Navigator.pop(context);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF6A359C),
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text('Save Feeding'),
-                    ),
-                  ),
-                ),
-              ],
+                  SizedBox(height: 16),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

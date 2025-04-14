@@ -4,7 +4,7 @@ class UserState {
     static int? userId;
     static String? name;
     static String? email;
-
+    static String? fcmToken;
     static final _storage = FlutterSecureStorage();
 
     static Future<void> setUserData(int id, String userName, String userEmail) async {

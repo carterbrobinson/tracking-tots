@@ -506,7 +506,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
     // Validate that end time is after start time
     if (_endTime.isBefore(_startTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('End time must be after start time'))
+        SnackBar(content: Text('End time must be after start time'), backgroundColor: Colors.red, duration: Duration(seconds: 4))
       );
       return;
     }

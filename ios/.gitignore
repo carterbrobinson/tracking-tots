@@ -32,3 +32,28 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Firebase configuration files with sensitive keys
+**/google-services.json                # Android Firebase config
+**/GoogleService-Info.plist            # iOS Firebase config
+lib/firebase_options.dart              # Flutter Firebase options with API keys
+
+# Environment variables
+.env
+*.env
+.env.*
+
+# iOS specific secrets
+**/ios/Flutter/Release.xcconfig        # May contain API keys or paths
+**/ios/Flutter/Debug.xcconfig          # May contain API keys or paths
+**/ios/Runner/AppDelegate.swift        # If it contains hardcoded secrets
+
+# Keystore files and signing info
+*.jks
+*.keystore
+key.properties
+
+# Any files containing secrets like server keys
+**/secrets.json
+**/secrets.*.json
+**/*.secret.*
