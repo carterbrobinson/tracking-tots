@@ -20,7 +20,18 @@ class TopNavigationBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
             ),
             child: AppBar(
-                title: Text(title),
+                title: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children:[
+                        Image.asset(
+                        "assets/tracking-tots-white.png",
+                        width: 40,
+                        height: 40,
+                        ),
+                        SizedBox(width: 10),
+                        Text(title),
+                    ],
+                ),
                 centerTitle: true,
                 backgroundColor: Colors.transparent,
                 elevation: 0,
@@ -94,7 +105,7 @@ class TopNavigationBar extends StatelessWidget implements PreferredSizeWidget {
                                 value: 'todo',
                                 child: ListTile(
                                     leading: Icon(Icons.checklist, color: Color(0xFF6A359C)),
-                                    title: Text('Todo'),
+                                    title: Text('To-Do List'),
                                 ),
                             ),
                             PopupMenuItem(

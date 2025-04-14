@@ -185,108 +185,465 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
   }
 
   Widget _buildAdvancedChart() {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.all(16),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: _sleepData,
-              isCurved: true,
-              gradient: LinearGradient(
-                colors: [Color(0xFF6A359C), Colors.purple],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSleepTimingChart(),
+          SizedBox(height: 24),
+          _buildSleepQualityDistribution(),
+          SizedBox(height: 24),
+          _buildWeeklySleepTotals(),
+        ],
+      ),
+    );
+  }
+    
+  Widget _buildSleepTimingChart() {
+    if (_sleepData.isEmpty) {
+      return _buildEmptyAnalyticsCard("Sleep Timing Patterns");
+    }
+    
+    // Process data to show when sleep is occurring
+    final Map<int, List<double>> hourlyDistribution = {};
+    for (int i = 0; i < 24; i++) {
+      hourlyDistribution[i] = [];
+    }
+    
+    try {
+      for (var spot in _sleepData) {
+        final startTime = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+        final durationMinutes = spot.y.toInt();
+        final endTime = startTime.add(Duration(minutes: durationMinutes));
+        
+        // Track each hour that this sleep session covers
+        DateTime currentHour = DateTime(startTime.year, startTime.month, startTime.day, startTime.hour);
+        
+        while (currentHour.isBefore(endTime)) {
+          final hour = currentHour.hour;
+          hourlyDistribution[hour]?.add(1.0);
+          currentHour = currentHour.add(Duration(hours: 1));
+        }
+      }
+    } catch (e) {
+      print('Error processing sleep timing data: $e');
+    }
+    
+    // Calculate sleep frequency for each hour (0-23)
+    final List<double> hourlyFrequency = List.generate(24, (hour) {
+      return hourlyDistribution[hour]?.length.toDouble() ?? 0;
+    });
+    
+    // Find max for scaling
+    final maxFrequency = hourlyFrequency.reduce((max, value) => max > value ? max : value);
+    
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Sleep Timing Patterns', 
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('Shows when baby is usually sleeping throughout the day',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            SizedBox(height: 16),
+            Container(
+              height: 160,
+              child: Row(
+                children: [
+                  // Left axis labels
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('High', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text('Medium', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text('Low', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text('None', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    ],
+                  ),
+                  SizedBox(width: 8),
+                  // Main chart
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: List.generate(24, (hour) {
+                        final frequency = hourlyFrequency[hour];
+                        final intensity = maxFrequency > 0 ? frequency / maxFrequency : 0;
+                        
+                        return Tooltip(
+                          message: '$hour:00 - ${(hour + 1) % 24}:00: ${frequency.toInt()} sleep sessions',
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                width: 10,
+                                height: (120 * intensity).toDouble(),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.withOpacity(0.3 + 0.7 * intensity),
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                hour.toString(),
+                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
               ),
-              barWidth: 4,
-              isStrokeCapRound: true,
-              dotData: FlDotData(
-                show: true,
-                getDotPainter: (spot, percent, barData, index) {
-                  return FlDotCirclePainter(
-                    radius: 6,
-                    color: Colors.white,
-                    strokeWidth: 3,
-                    strokeColor: Colors.purple,
-                  );
-                },
-              ),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  colors: [
-                    Color(0xFF6A359C).withOpacity(0.3),
-                    Colors.purple.withOpacity(0.1),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
+            ),
+            SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Hours of the Day (24h format)',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ),
           ],
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: Colors.grey.withOpacity(0.2),
-                strokeWidth: 1,
-              );
-            },
-          ),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                  return Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      DateFormat('MM/dd').format(date),
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSleepQualityDistribution() {
+    if (_sleepData.isEmpty) {
+      return _buildEmptyAnalyticsCard("Sleep Quality Distribution");
+    }
+    
+    // Analyze sleep quality
+    Map<String, int> qualityDistribution = {
+      'Insufficient': 0,
+      'Below Recommended': 0, 
+      'Optimal': 0,
+      'Extended': 0,
+      'Power Nap': 0,
+      'Ideal Nap': 0,
+      'Long Nap': 0,
+    };
+    
+    try {
+      for (var spot in _sleepData) {
+        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+        final durationHours = spot.y / 60;
+        final isNap = _isNapTime(date);
+        
+        if (isNap) {
+          if (durationHours < 0.5) {
+            qualityDistribution['Power Nap'] = (qualityDistribution['Power Nap'] ?? 0) + 1;
+          } else if (durationHours <= 1) {
+            qualityDistribution['Ideal Nap'] = (qualityDistribution['Ideal Nap'] ?? 0) + 1;
+          } else {
+            qualityDistribution['Long Nap'] = (qualityDistribution['Long Nap'] ?? 0) + 1;
+          }
+        } else {
+          if (durationHours < 6) {
+            qualityDistribution['Insufficient'] = (qualityDistribution['Insufficient'] ?? 0) + 1;
+          } else if (durationHours < 7) {
+            qualityDistribution['Below Recommended'] = (qualityDistribution['Below Recommended'] ?? 0) + 1;
+          } else if (durationHours <= 9) {
+            qualityDistribution['Optimal'] = (qualityDistribution['Optimal'] ?? 0) + 1;
+          } else {
+            qualityDistribution['Extended'] = (qualityDistribution['Extended'] ?? 0) + 1;
+          }
+        }
+      }
+    } catch (e) {
+      print('Error analyzing sleep quality: $e');
+    }
+    
+    // Filter out zeros to avoid empty pie sections
+    final Map<String, int> filteredQuality = Map.fromEntries(
+      qualityDistribution.entries.where((entry) => entry.value > 0)
+    );
+    
+    // Color mapping for quality categories
+    final Map<String, Color> qualityColors = {
+      'Insufficient': Colors.red,
+      'Below Recommended': Colors.orange, 
+      'Optimal': Colors.green,
+      'Extended': Colors.blue,
+      'Power Nap': Colors.amber,
+      'Ideal Nap': Colors.teal,
+      'Long Nap': Colors.indigo,
+    };
+    
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Sleep Quality Distribution', 
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('Breakdown of sleep quality categories',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            SizedBox(height: 16),
+            Container(
+              height: 200,
+              child: filteredQuality.isNotEmpty
+                  ? PieChart(
+                      PieChartData(
+                        sections: filteredQuality.entries.map((entry) {
+                          final percentage = (entry.value / _sleepData.length * 100).toStringAsFixed(0);
+                          return PieChartSectionData(
+                            value: entry.value.toDouble(),
+                            title: '$percentage%',
+                            titleStyle: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            color: qualityColors[entry.key] ?? Colors.grey,
+                            radius: 70,
+                          );
+                        }).toList(),
+                        centerSpaceRadius: 40,
+                        sectionsSpace: 2,
+                      ),
+                    )
+                  : Center(child: Text('No quality data available')),
+            ),
+            SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: filteredQuality.keys.map((key) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: qualityColors[key] ?? Colors.grey,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  );
-                },
-                reservedSize: 30,
+                    SizedBox(width: 4),
+                    Text(key, style: TextStyle(fontSize: 12)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeeklySleepTotals() {
+    if (_sleepData.isEmpty) {
+      return _buildEmptyAnalyticsCard("Weekly Sleep Totals");
+    }
+    
+    // Group sleep data by day
+    Map<String, double> dailyTotals = {};
+    
+    try {
+      for (var spot in _sleepData) {
+        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+        final dateStr = DateFormat('MM/dd').format(date);
+        dailyTotals[dateStr] = (dailyTotals[dateStr] ?? 0) + spot.y;
+      }
+    } catch (e) {
+      print('Error processing daily sleep totals: $e');
+    }
+    
+    // Get the last 7 days (or fewer if we don't have that much data)
+    List<String> dates = dailyTotals.keys.toList();
+    dates.sort(); // Sort chronologically
+    
+    // Take only the last 7 days
+    if (dates.length > 7) {
+      dates = dates.sublist(dates.length - 7);
+    }
+    
+    // Create filtered map with just those days
+    Map<String, double> filteredDailyTotals = {};
+    for (var date in dates) {
+      filteredDailyTotals[date] = dailyTotals[date] ?? 0;
+    }
+    
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Weekly Sleep Totals', 
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('Total sleep hours per day over the past week',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            SizedBox(height: 16),
+            Container(
+              height: 200,
+              child: dates.isNotEmpty
+                  ? BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: (filteredDailyTotals.values.reduce(
+                                (a, b) => a > b ? a : b) / 60)
+                            .ceilToDouble() +
+                            1,
+                        barGroups: List.generate(dates.length, (index) {
+                          final date = dates[index];
+                          return BarChartGroupData(
+                            x: index,
+                            barRods: [
+                              BarChartRodData(
+                                toY: (filteredDailyTotals[date] ?? 0) / 60,
+                                width: 20,
+                                color: Color(0xFF6A359C),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(4),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.withOpacity(0.2),
+                              width: 1,
+                            ),
+                            left: BorderSide(
+                              color: Colors.grey.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                final index = value.toInt();
+                                if (index >= 0 && index < dates.length) {
+                                  return Padding(
+                                    padding: EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      dates[index],
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return Text('');
+                              },
+                              reservedSize: 30,
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                return Text(
+                                  '${value.toInt()}h',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                );
+                              },
+                              reservedSize: 30,
+                            ),
+                          ),
+                          topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                        ),
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            tooltipPadding: EdgeInsets.all(8),
+                            tooltipRoundedRadius: 8,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              final date = dates[group.x.toInt()];
+                              final hours = (rod.toY).toStringAsFixed(1);
+                              return BarTooltipItem(
+                                '$date\n$hours hours',
+                                TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(child: Text('No daily sleep data available')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyAnalyticsCard(String title) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Container(
+              height: 150,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.nights_stay_outlined, size: 48, color: Colors.grey[400]),
+                  SizedBox(height: 16),
+                  Text(
+                    'Not enough sleep data to display insights',
+                    style: TextStyle(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Add more sleep sessions to see analytics',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    '${(value / 60).toStringAsFixed(1)}h',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  );
-                },
-                reservedSize: 40,
-              ),
-            ),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          borderData: FlBorderData(
-            show: true,
-            border: Border.all(color: Colors.grey.withOpacity(0.2)),
-          ),
-          lineTouchData: LineTouchData(
-            touchTooltipData: LineTouchTooltipData(
-              tooltipPadding: EdgeInsets.all(8),
-              tooltipRoundedRadius: 8,
-              tooltipMargin: 10,
-              getTooltipItems: (List<LineBarSpot> touchedSpots) {
-                return touchedSpots.map((spot) {
-                  final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                  return LineTooltipItem(
-                    '${DateFormat('MMM dd').format(date)}\n${(spot.y / 60).toStringAsFixed(1)}h',
-                    TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                }).toList();
-              },
-            ),
-          ),
+          ],
         ),
       ),
     );

@@ -165,3 +165,9 @@ macos/Runner.xcodeproj/project.pbxproj
 
 # Build files
 build/
+
+# Firebase credentials and config
+firebase_credentials.json
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase_options.dart

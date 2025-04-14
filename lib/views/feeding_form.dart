@@ -8,6 +8,7 @@ import 'package:trackingtots/views/widgets/top_navigation_bar.dart';
 import 'package:trackingtots/user_state.dart';
 import 'package:trackingtots/views/widgets/form_builder.dart';
 import 'package:trackingtots/views/widgets/modal_sheet.dart';
+import 'dart:math' show max;
 
 class FeedingForm extends StatefulWidget {
   @override
@@ -167,33 +168,298 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
   }
 
   Widget _buildAnalytics() {
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.all(16),
-      child: LineChart(
-        LineChartData(
-          lineBarsData: [
-            LineChartBarData(
-              spots: _feedingData,
-              isCurved: true,
-              gradient: LinearGradient(
-                colors: [Color(0xFF6A359C), Colors.purple],
+      child: Column(
+        children: [
+          _buildFeedingTypeDistribution(),
+          SizedBox(height: 24),
+          _buildFeedingTrends(),
+          SizedBox(height: 24),
+          _buildFeedingAmountChart(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedingTypeDistribution() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Feeding Type', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Container(
+              height: 200,
+              child: PieChart(
+                PieChartData(
+                  sections: [
+                    PieChartSectionData(
+                      value: _typeDistribution['Breast']?.toDouble() ?? 0,
+                      title: '${((_typeDistribution['Breast'] ?? 0) / _totalFeedings * 100).toStringAsFixed(0)}%',
+                      color: Colors.purple,
+                      radius: 60,
+                    ),
+                    PieChartSectionData(
+                      value: _typeDistribution['Bottle']?.toDouble() ?? 0,
+                      title: '${((_typeDistribution['Bottle'] ?? 0) / _totalFeedings * 100).toStringAsFixed(0)}%',
+                      color: Colors.blue,
+                      radius: 60,
+                    ),
+                  ],
+                  centerSpaceRadius: 40,
+                ),
               ),
-              barWidth: 4,
-              dotData: FlDotData(show: true),
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem('Breast', Colors.purple),
+                SizedBox(width: 16),
+                _buildLegendItem('Bottle', Colors.blue),
+              ],
             ),
           ],
-          gridData: FlGridData(show: true),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                  return Text(DateFormat('MM/dd').format(date));
-                },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String text, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: 4),
+        Text(text),
+      ],
+    );
+  }
+
+  Widget _buildFeedingTrends() {
+    // Group by day
+    Map<String, int> dailyCounts = {};
+    
+    for (var item in _feedingDetails) {
+      final date = DateTime.parse(item['start_time']);
+      final dateStr = DateFormat('MM/dd').format(date);
+      dailyCounts[dateStr] = (dailyCounts[dateStr] ?? 0) + 1;
+    }
+    
+    // Sort dates chronologically
+    List<String> dates = dailyCounts.keys.toList();
+    dates.sort();
+    
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Daily Feeding Frequency', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Container(
+              height: 200,
+              child: BarChart(
+                BarChartData(
+                  barGroups: List.generate(
+                    dates.length,
+                    (index) => BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: dailyCounts[dates[index]]!.toDouble(),
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                          width: 20,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: dailyCounts.values.isEmpty ? 10 : dailyCounts.values.reduce(max).toDouble() + 2,
+                  gridData: FlGridData(show: true, horizontalInterval: 1),
+                  titlesData: FlTitlesData(
+                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index >= 0 && index < dates.length) {
+                            // Show all dates when there are few entries, otherwise show every other one
+                            if (dates.length <= 7 || index % 2 == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(dates[index], style: TextStyle(fontSize: 10)),
+                              );
+                            }
+                          }
+                          return const Text('');
+                        },
+                        reservedSize: 24, // Give more space for the labels
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedingAmountChart() {
+    // Group by day and feeding type
+    Map<String, Map<String, dynamic>> feedingStats = {};
+    
+    for (var item in _feedingDetails) {
+      final date = DateTime.parse(item['start_time']);
+      final dateStr = DateFormat('MM/dd').format(date);
+      
+      if (!feedingStats.containsKey(dateStr)) {
+        feedingStats[dateStr] = {
+          'breast_duration': 0,
+          'bottle_amount': 0,
+        };
+      }
+      
+      if (item['type'] == 'Breast') {
+        feedingStats[dateStr]!['breast_duration'] += 
+          ((item['left_breast_duration'] ?? 0) + (item['right_breast_duration'] ?? 0));
+      } else if (item['type'] == 'Bottle') {
+        feedingStats[dateStr]!['bottle_amount'] += (item['bottle_amount'] ?? 0);
+      }
+    }
+    
+    // Convert to sorted list of dates
+    List<String> dates = feedingStats.keys.toList();
+    dates.sort();
+    
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Daily Feeding Amounts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Container(
+              height: 250,
+              child: BarChart(
+                BarChartData(
+                  barGroups: List.generate(
+                    dates.length,
+                    (index) => BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        // Breast feeding (minutes)
+                        BarChartRodData(
+                          toY: feedingStats[dates[index]]!['breast_duration'].toDouble(),
+                          gradient: LinearGradient(
+                            colors: [Colors.purple.shade300, Colors.purple.shade700],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                          width: 12,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                        // Bottle feeding (ml)
+                        BarChartRodData(
+                          toY: feedingStats[dates[index]]!['bottle_amount'].toDouble() / 10, // Scale down to fit
+                          gradient: LinearGradient(
+                            colors: [Colors.blue.shade300, Colors.blue.shade700],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                          width: 12,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  alignment: BarChartAlignment.spaceAround,
+                  gridData: FlGridData(show: true),
+                  titlesData: FlTitlesData(
+                    rightTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Text('${(value * 10).toInt()} ml', style: TextStyle(fontSize: 10, color: Colors.blue)),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Text('${value.toInt()} min', style: TextStyle(fontSize: 10, color: Colors.purple)),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index >= 0 && index < dates.length) {
+                            // Show all dates when there are few entries, otherwise show every other one
+                            if (dates.length <= 7 || index % 2 == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(dates[index], style: TextStyle(fontSize: 10)),
+                              );
+                            }
+                          }
+                          return const Text('');
+                        },
+                        reservedSize: 24, // Give more space for the labels
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem('Breast (minutes)', Colors.purple),
+                SizedBox(width: 16),
+                _buildLegendItem('Bottle (ml)', Colors.blue),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -213,32 +479,78 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
       padding: EdgeInsets.all(16),
       itemCount: _feedingDetails.length,
       itemBuilder: (context, index) {
-        // Get the feeding details directly
-        final item = _feedingDetails[index];
-        final time = DateTime.parse(item['start_time']);
-        final feedingType = item['type'] ?? 'Unknown';
-        
-        // Build the trailing text based on the actual feeding data
-        String trailingText;
-        if (feedingType == 'Bottle') {
-          trailingText = '${item['bottle_amount'] ?? 0}ml';
-        } else {
-          trailingText = '${item['left_breast_duration'] ?? 0}m L, ${item['right_breast_duration'] ?? 0}m R';
-        }
-        
-        return Card(
-          margin: EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: Icon(
-              feedingType == 'Bottle' ? Icons.baby_changing_station : Icons.child_care,
-              color: Color(0xFF6A359C)
+        try {
+          // Get the feeding details with null safety
+          final item = _feedingDetails[index];
+          if (item == null) {
+            return _buildErrorCard('Missing data entry');
+          }
+          
+          final timeStr = item['start_time'] as String?;
+          final feedingType = item['type'] as String? ?? 'Unknown';
+          
+          // Safely parse date or use current time as fallback
+          DateTime time;
+          try {
+            time = timeStr != null ? DateTime.parse(timeStr) : DateTime.now();
+          } catch (e) {
+            time = DateTime.now();
+            print('Error parsing date: $e');
+          }
+          
+          // Calculate durations safely
+          final leftDuration = item['left_breast_duration'] is int ? item['left_breast_duration'] as int : 0;
+          final rightDuration = item['right_breast_duration'] is int ? item['right_breast_duration'] as int : 0;
+          final bottleAmount = item['bottle_amount'] is int ? item['bottle_amount'] as int : 0;
+          
+          // Build the trailing text based on the actual feeding data
+          String trailingText;
+          if (feedingType == 'Bottle') {
+            trailingText = '${bottleAmount}ml';
+          } else {
+            trailingText = '${leftDuration}m L, ${rightDuration}m R';
+          }
+          
+          // Calculate end time safely
+          final totalDuration = leftDuration + rightDuration;
+          final endTime = time.add(Duration(minutes: totalDuration));
+          
+          return Card(
+            margin: EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Icon(
+                feedingType == 'Bottle' ? Icons.baby_changing_station : Icons.child_care,
+                color: Color(0xFF6A359C)
+              ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(DateFormat('MMMM d, y').format(time)),
+                  Text('${DateFormat('hh:mm a').format(time)} - ${DateFormat('hh:mm a').format(endTime)}'),
+                ],
+              ),
+              trailing: Text('$feedingType - $trailingText'),
             ),
-            title: Text(DateFormat('MMMM d, y').format(time)),
-            subtitle: Text(feedingType),
-            trailing: Text(trailingText),
-          ),
-        );
+          );
+        } catch (e) {
+          // Return a fallback card for invalid data
+          print('Error rendering feeding item: $e');
+          return _buildErrorCard('Could not display this feeding entry');
+        }
       },
+    );
+  }
+
+  // Helper method for consistent error cards
+  Widget _buildErrorCard(String message) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 8),
+      color: Colors.red.shade50,
+      child: ListTile(
+        leading: Icon(Icons.error_outline, color: Colors.red),
+        title: Text('Invalid data'),
+        subtitle: Text(message),
+      ),
     );
   }
 

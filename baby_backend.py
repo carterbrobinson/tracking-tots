@@ -502,10 +502,20 @@ def register_fcm_token():
     if not user_id or not token:
         return jsonify({"message": "User ID and token are required"}), 400
 
+    # Delete any existing token that matches this one
     existing_token = FCMToken.query.filter_by(token=token).first()
-    if not existing_token:
-        db.session.add(FCMToken(user_id=user_id, token=token, platform=platform))
-        db.session.commit()
+    if existing_token:
+        # Token already exists, no need to add it again
+        print(f"[DEBUG] FCM token already exists for user {user_id}: {token}")
+        return jsonify({"message": "FCM token already registered"}), 200
+        
+    # Option to remove all previous tokens for this user+platform combination
+    # Uncomment the line below to use this approach
+    FCMToken.query.filter_by(user_id=user_id, platform=platform).delete()
+    
+    # Add the new token
+    db.session.add(FCMToken(user_id=user_id, token=token, platform=platform))
+    db.session.commit()
 
     print(f"[DEBUG] FCM token registered for user {user_id}: {token}")
     return jsonify({"message": "FCM token registered successfully"}), 200

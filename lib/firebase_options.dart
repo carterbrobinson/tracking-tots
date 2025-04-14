@@ -41,7 +41,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBrgDB_v4WbyBHwSkVA9WIpPdDFGqt5Bnk',
+    apiKey: 'AIzaSyCx4w1fDr3s973yD4iibC4FOzJb_XfnOJM',
     appId: '1:1089758434564:web:a55826cf93dbcc2c392c51',
     messagingSenderId: '1089758434564',
     projectId: 'tracking-tots',
@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAFTOdLkd7n8VjrV_v65CuFst6ovoc_KYE',
+    apiKey: 'AIzaSyD2O2uq33GCTn7bSn9ysdc7bVEhf5ECEy4',
     appId: '1:1089758434564:android:7d11115c52335433392c51',
     messagingSenderId: '1089758434564',
     projectId: 'tracking-tots',
@@ -59,7 +59,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBhDRdsjMEtqReg-acMv_ziRgXyRvrPOb8',
+    apiKey: 'AIzaSyDcMSNULov1i6z6Pd5ebxla_o740BsDB0Y',
     appId: '1:1089758434564:ios:904ad7d5eea0e72f392c51',
     messagingSenderId: '1089758434564',
     projectId: 'tracking-tots',
@@ -68,7 +68,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBhDRdsjMEtqReg-acMv_ziRgXyRvrPOb8',
+    apiKey: 'AIzaSyDcMSNULov1i6z6Pd5ebxla_o740BsDB0Y',
     appId: '1:1089758434564:ios:904ad7d5eea0e72f392c51',
     messagingSenderId: '1089758434564',
     projectId: 'tracking-tots',
@@ -77,7 +77,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBrgDB_v4WbyBHwSkVA9WIpPdDFGqt5Bnk',
+    apiKey: 'AIzaSyCx4w1fDr3s973yD4iibC4FOzJb_XfnOJM',
     appId: '1:1089758434564:web:1cc972769fc9560d392c51',
     messagingSenderId: '1089758434564',
     projectId: 'tracking-tots',

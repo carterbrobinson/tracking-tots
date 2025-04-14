@@ -111,7 +111,7 @@ class CommonFormWidgets {
 
   static Widget buildSubmitButton({
     required String text,
-    required VoidCallback onPressed,
+    VoidCallback? onPressed,
   }) {
     return ElevatedButton(
       onPressed: onPressed,

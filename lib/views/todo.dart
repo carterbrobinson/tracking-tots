@@ -436,45 +436,7 @@ class _TodoFormState extends State<TodoForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('To-Do List'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications),
-            onPressed: () async {
-              if (UserState.userId == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Please log in first')),
-                );
-                return;
-              }
-              
-              try {
-                final response = await http.post(
-                  Uri.parse('http://127.0.0.1:5001/test-user-notification/${UserState.userId}'),
-                  headers: {'Content-Type': 'application/json'},
-                );
-                
-                if (response.statusCode == 200) {
-                  final data = jsonDecode(response.body);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(data['message'])),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to send test notification')),
-                  );
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
-            },
-            tooltip: 'Test Notification',
-          ),
-        ],
-      ),
+      appBar: TopNavigationBar(title: 'To-Do List'),
       backgroundColor: Colors.purple[50],
       body: CustomScrollView(
         slivers: <Widget>[
@@ -576,22 +538,79 @@ class _TodoFormState extends State<TodoForm> {
           ),
         ],
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
-            begin: Alignment.bottomLeft,
-            end: Alignment.topRight,
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Test notification button
+          Container(
+            margin: EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue[400]!, Colors.blue[700]!],
+                begin: Alignment.bottomLeft,
+                end: Alignment.topRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: FloatingActionButton(
+              heroTag: 'testNotification',
+              onPressed: () async {
+                if (UserState.userId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Please log in first')),
+                  );
+                  return;
+                }
+                
+                try {
+                  final response = await http.post(
+                    Uri.parse('http://127.0.0.1:5001/test-user-notification/${UserState.userId}'),
+                    headers: {'Content-Type': 'application/json'},
+                  );
+                  
+                  if (response.statusCode == 200) {
+                    final data = jsonDecode(response.body);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(data['message'])),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to send test notification')),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              },
+              tooltip: 'Test Notification',
+              child: Icon(Icons.notifications),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              hoverElevation: 0,
+            ),
           ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: FloatingActionButton(
-          onPressed: () => _showAddTodoDialog(context),
-          child: Icon(Icons.add),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          hoverElevation: 0,
-        ),
+          // Add todo button
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF9969C7), Color(0xFF6A359C)],
+                begin: Alignment.bottomLeft,
+                end: Alignment.topRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: FloatingActionButton(
+              heroTag: 'addTodo',
+              onPressed: () => _showAddTodoDialog(context),
+              child: Icon(Icons.add),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              hoverElevation: 0,
+            ),
+          ),
+        ],
       ),
     );
   }
