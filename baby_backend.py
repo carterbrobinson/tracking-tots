@@ -9,10 +9,6 @@ from dotenv import load_dotenv
 from firebase_admin import credentials, messaging
 import firebase_admin
 from apscheduler.schedulers.background import BackgroundScheduler
-import json
-import requests
-import threading
-
 
 load_dotenv()
 
@@ -24,14 +20,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app = Flask(__name__)
 CORS(app)
 
-# #in memory data storage simulate database
-# todos = []
-# fcm_tokens = []
-# scheduler = BackgroundScheduler()
-# scheduler.start()
 # SQLite Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/baby_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
@@ -83,6 +75,7 @@ class Todo(db.Model):
     notes = db.Column(db.Text, nullable=True)
     reminder_time = db.Column(db.DateTime, nullable=True)
     completed = db.Column(db.Boolean, default=False, nullable=False)
+    reminder_notified = db.Column(db.Boolean, default=False, nullable=False)
 
 class Reminder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -115,32 +108,22 @@ def send_notification(token, title, body):
 def send_due_reminders():
     with app.app_context():
         now = datetime.datetime.now(datetime.timezone.utc)
-        in_one_minute = now + datetime.timedelta(minutes=2)
         
         print(f"[DEBUG] Checking reminders at {now.isoformat()}")
         
-        # Improve the todo filtering logic to ensure proper timezone handling
+        # Get todos with reminders that are due in the next minute and haven't been notified
         due_todos = Todo.query.filter(
             Todo.reminder_time != None,
-            Todo.completed == False
+            Todo.completed == False,
+            Todo.reminder_notified == False,
+            Todo.reminder_time <= now + datetime.timedelta(minutes=1),
+            Todo.reminder_time > now - datetime.timedelta(minutes=1)
         ).all()
         
-        # Add more detailed logging about what was found
-        print(f"[DEBUG] Found {len(due_todos)} todos with reminders")
+        print(f"[DEBUG] Found {len(due_todos)} due todos in the next minute")
         
-        # Manual filtering with detailed timezone comparison logging
-        filtered_todos = []
+        # Process the due todos
         for todo in due_todos:
-            todo_time_utc = todo.reminder_time.replace(tzinfo=datetime.timezone.utc)
-            is_due = todo_time_utc >= now and todo_time_utc <= in_one_minute
-            print(f"[DEBUG] Todo ID {todo.id} | Time: {todo_time_utc.isoformat()} | Is due: {is_due}")
-            if is_due:
-                filtered_todos.append(todo)
-
-        print(f"[DEBUG] Found {len(filtered_todos)} due todos in the next minute")
-        
-        # Process the filtered todos
-        for todo in filtered_todos:
             tokens = FCMToken.query.filter_by(user_id=todo.user_id).all()
             print(f"[DEBUG] Found {len(tokens)} tokens for user {todo.user_id}")
             
@@ -156,7 +139,6 @@ def send_due_reminders():
                             title="Task Reminder",
                             body=f"Don't forget: {todo.notes}"
                         ),
-                        # Add data payload to allow app to handle the notification
                         data={
                             "type": "todo",
                             "id": str(todo.id),
@@ -165,11 +147,16 @@ def send_due_reminders():
                     )
                     response = messaging.send(message)
                     print(f"[✅] Reminder sent for Todo ID {todo.id}: {response}")
+                    
+                    # Mark the todo as notified
+                    todo.reminder_notified = True
+                    db.session.commit()
+                    
                 except Exception as e:
                     print(f"[❌] Error sending reminder for Todo ID {todo.id}: {e}")
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(send_due_reminders, 'interval', seconds=30)
+scheduler.add_job(send_due_reminders, 'interval', seconds=30)  # Check every 30 seconds
 scheduler.start()
 
 # API Endpoints
@@ -284,6 +271,45 @@ def get_feeding_data(user_id):
         "notes": f.notes
     } for f in feedings])
 
+@app.route('/feeding/<int:user_id>', methods=['DELETE'])
+def delete_feeding(user_id):
+
+    feeding = Feeding.query.filter_by(id=user_id).first()
+    if not feeding:
+        return jsonify({"error": "Feeding not found"}), 404
+
+    db.session.delete(feeding)
+    db.session.commit()
+    return jsonify({"message": "Feeding deleted successfully"}), 200
+
+@app.route('/feeding/<int:user_id>', methods=['PUT'])
+def update_feeding(user_id):
+    data = request.json
+    feeding = Feeding.query.filter_by(id=user_id).first()
+    if not feeding:
+        return jsonify({"error": "Feeding not found"}), 404
+
+    # Update the feeding record with new data
+    if 'type' in data:
+        feeding.type = data['type']
+    if 'left_breast_duration' in data:
+        feeding.left_breast_duration = data['left_breast_duration']
+    if 'right_breast_duration' in data:
+        feeding.right_breast_duration = data['right_breast_duration']
+    if 'bottle_amount' in data:
+        feeding.bottle_amount = data['bottle_amount']
+    if 'start_time' in data:
+        feeding.start_time = datetime.datetime.fromisoformat(data['start_time'])
+    if 'end_time' in data:
+        feeding.end_time = datetime.datetime.fromisoformat(data['end_time'])
+    if 'notes' in data:
+        feeding.notes = data.get('notes')
+
+    db.session.commit()
+    return jsonify({"message": "Feeding updated successfully"}), 200
+    
+    
+
 @app.route('/sleeping/<int:user_id>', methods=['POST'])
 def add_sleep(user_id):
     data = request.json
@@ -295,7 +321,6 @@ def add_sleep(user_id):
     wake_window = None
     if last_sleep:
         wake_window = int((start_time - last_sleep.end_time).total_seconds() / 60)
-
 
     new_sleep = Sleep(
         user_id=user_id,
@@ -318,6 +343,44 @@ def get_sleep_data(user_id):
         "wake_window": s.wake_window,
         "notes": s.notes
     } for s in sleep_data])
+
+@app.route('/sleeping/<int:user_id>', methods=['DELETE'])
+def delete_sleep(user_id):
+    sleep_data = Sleep.query.filter_by(id=user_id).first()
+    if not sleep_data:
+        return jsonify({"error": "Sleep data not found"}), 404
+
+    db.session.delete(sleep_data)
+    db.session.commit()
+    return jsonify({"message": "Sleep data deleted successfully"}), 200
+
+@app.route('/sleeping/<int:user_id>', methods=['PUT'])
+def update_sleep(user_id):
+    data = request.json
+    sleep_data = Sleep.query.filter_by(id=user_id).first()
+    if not sleep_data:
+        return jsonify({"error": "Sleep data not found"}), 404
+
+    # Update the sleep record with new data
+    if 'start_time' in data:
+        sleep_data.start_time = datetime.datetime.fromisoformat(data['start_time'])
+    if 'end_time' in data:
+        sleep_data.end_time = datetime.datetime.fromisoformat(data['end_time'])
+    if 'notes' in data:
+        sleep_data.notes = data.get('notes')
+    
+    # Recalculate wake window if needed
+    if 'start_time' in data and sleep_data.user_id:
+        last_sleep = Sleep.query.filter(
+            Sleep.user_id == sleep_data.user_id,
+            Sleep.end_time < sleep_data.start_time
+        ).order_by(Sleep.end_time.desc()).first()
+        
+        if last_sleep:
+            sleep_data.wake_window = int((sleep_data.start_time - last_sleep.end_time).total_seconds() / 60)
+
+    db.session.commit()
+    return jsonify({"message": "Sleep data updated successfully"}), 200
 
 @app.route('/diaper-change/<int:user_id>', methods=['GET'])
 def get_diaper_change_data(user_id):
@@ -342,6 +405,45 @@ def add_diaper_change(user_id):
     db.session.commit()
     return jsonify({"message": "Diaper change record added!"}), 201
 
+@app.route('/diaper-change/<int:user_id>', methods=['DELETE'])
+def delete_diaper_change(user_id):
+    diaper_change = DiaperChange.query.filter_by(id=user_id).first()
+    if not diaper_change:
+        return jsonify({"error": "Diaper change not found"}), 404
+
+    db.session.delete(diaper_change)
+    db.session.commit()
+    return jsonify({"message": "Diaper change deleted successfully"}), 200
+
+@app.route('/diaper-change/<int:user_id>', methods=['PUT'])
+def update_diaper_change(user_id):
+    data = request.json
+    diaper_change = DiaperChange.query.filter_by(id=user_id).first()
+    if not diaper_change:
+        return jsonify({"error": "Diaper change not found"}), 404
+
+    # Update the diaper change record with new data
+    if 'type' in data:
+        diaper_change.type = data['type']
+    if 'time' in data:
+        diaper_change.time = datetime.datetime.fromisoformat(data['time'])
+    if 'notes' in data:
+        diaper_change.notes = data.get('notes')
+
+    db.session.commit()
+    return jsonify({"message": "Diaper change updated successfully"}), 200
+
+@app.route('/todo/<int:user_id>', methods=['GET'])
+def get_todo_list(user_id):
+    todos = Todo.query.filter_by(user_id=user_id).order_by(Todo.time.desc()).all()
+    return jsonify([{
+        "id": t.id,
+        "time": t.time.replace(tzinfo=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "notes": t.notes,
+        "completed": t.completed,
+        "reminder_time": t.reminder_time.replace(tzinfo=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if t.reminder_time else None
+    } for t in todos])
+
 @app.route('/todo/<int:user_id>', methods=['POST'])
 def add_task(user_id):
     data = request.json
@@ -357,24 +459,13 @@ def add_task(user_id):
     
     new_task = Todo(
         user_id=user_id,
-        time=datetime.datetime.fromisoformat(data['time']),
+        time=datetime.datetime.fromisoformat(data['time']).replace(tzinfo=datetime.timezone.utc),
         notes=data.get('notes'),
-        reminder_time=datetime.datetime.fromisoformat(reminder_time) if reminder_time else None
+        reminder_time=datetime.datetime.fromisoformat(reminder_time).replace(tzinfo=datetime.timezone.utc) if reminder_time else None
     )
     db.session.add(new_task)
     db.session.commit()
     return jsonify({"message": "task record added!"}), 201
-
-@app.route('/todo/<int:user_id>', methods=['GET'])
-def get_todo_list(user_id):
-    todos = Todo.query.filter_by(user_id=user_id).order_by(Todo.time.desc()).all()
-    return jsonify([{
-        "id": t.id,
-        "time": t.time.isoformat(),
-        "notes": t.notes,
-        "completed": t.completed,
-        "reminder_time": t.reminder_time.isoformat() if t.reminder_time else None
-    } for t in todos])
 
 @app.route('/todo/<int:user_id>', methods=['DELETE'])
 def remove_task(user_id):
@@ -385,6 +476,29 @@ def remove_task(user_id):
     db.session.delete(todo)
     db.session.commit()
     return jsonify({"message": "Todo deleted successfully"}), 200
+
+@app.route('/todo/<int:todo_id>', methods=['PUT'])
+def update_todo(todo_id):
+    data = request.json
+    todo = Todo.query.filter_by(id=todo_id).first()
+    if not todo:
+        return jsonify({"error": "Todo not found"}), 404
+
+    # Update the todo record with new data
+    if 'time' in data:
+        todo.time = datetime.datetime.fromisoformat(data['time']).replace(tzinfo=datetime.timezone.utc)
+    if 'notes' in data:
+        todo.notes = data.get('notes')
+    if 'completed' in data:
+        todo.completed = data['completed']
+    if 'reminder_time' in data:
+        reminder_time = data.get('reminder_time')
+        todo.reminder_time = datetime.datetime.fromisoformat(reminder_time).replace(tzinfo=datetime.timezone.utc) if reminder_time else None
+        # Reset the notified flag when reminder time is updated
+        todo.reminder_notified = False
+
+    db.session.commit()
+    return jsonify({"message": "Todo updated successfully"}), 200
 
 @app.route('/todo/<int:todo_id>/toggle', methods=['PATCH'])
 def toggle_todo(todo_id):
@@ -429,6 +543,16 @@ def get_tummy_time_data(user_id):
         "duration": t.duration,
         "notes": t.notes
     } for t in tummy_time_data])
+
+@app.route('/tummy-time/<int:user_id>', methods=['DELETE'])
+def delete_tummy_time(user_id):
+    tummy_time = TummyTime.query.filter_by(id=user_id).first()
+    if not tummy_time:
+        return jsonify({"error": "Tummy time not found"}), 404
+
+    db.session.delete(tummy_time)
+    db.session.commit()
+    return jsonify({"message": "Tummy time deleted successfully"}), 200
 
 @app.route('/calendar/<int:user_id>', methods=['GET'])
 def get_calendar(user_id):
@@ -549,9 +673,76 @@ def check_reminders():
     return jsonify({"message": f"Processed {len(reminders)} reminders"}), 200
 
         
+# @app.route('/homepage/<int:user_id>', methods=['GET'])
+# def get_homepage_data(user_id):
+#     try:
+#         feedings = Feeding.query.filter_by(user_id=user_id).all()
+#         diaper_changes = DiaperChange.query.filter_by(user_id=user_id).all()
+#         tummy_times = TummyTime.query.filter_by(user_id=user_id).all()
+#         sleep = Sleep.query.filter_by(user_id=user_id).all()
+        
+#         activities = []
+#         activities.extend([{
+#             "id": f.id,
+#             "type": "Feeding",
+#             "time": f.start_time.isoformat(),
+#             "end_time": f.end_time.isoformat(),
+#             "details": f"Type: {f.type}, Duration: {(f.end_time - f.start_time).total_seconds() / 60:.0f} minutes",
+#             "notes": f.notes
+#         } for f in feedings])
+
+#         activities.extend([{
+#             "id": d.id,
+#             "type": "Diaper Change",
+#             "activity_type": d.type,
+#             "time": d.time.isoformat(),
+#             "details": f"Type: {d.type}",
+#             "notes": d.notes
+#         } for d in diaper_changes])
+
+#         activities.extend([{
+#             "id": t.id,
+#             "type": "Tummy Time",
+#             "time": t.start_time.isoformat(),
+#             "end_time": t.end_time.isoformat(),
+#             "details": f"Duration: {t.duration} minutes",
+#             "notes": t.notes
+#         } for t in tummy_times])
+
+#         activities.extend([{
+#             "id": s.id,
+#             "type": "Sleep",
+#             "time": s.start_time.isoformat(),
+#             "end_time": s.end_time.isoformat(),
+#             "details": f"Duration: {(s.end_time - s.start_time).total_seconds() / 60:.0f} minutes",
+#             "notes": s.notes
+#         } for s in sleep])
+
+#         activities.sort(key=lambda x: x['time'], reverse=True)
+
+#         return jsonify({
+#             "success": True,
+#             "activities": activities
+#         }), 200
+    
+#     except Exception as e:
+#         print(f"Error fetching homepage data: {e}")
+#         return jsonify({
+#             "success": False,
+#             "message": "Error fetching homepage data"
+#         }), 500
+
 @app.route('/homepage/<int:user_id>', methods=['GET'])
 def get_homepage_data(user_id):
     try:
+        # Get pagination parameters from request
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+
+        # Calculate offset
+        offset = (page - 1) * limit
+
+        # Get all activities
         feedings = Feeding.query.filter_by(user_id=user_id).all()
         diaper_changes = DiaperChange.query.filter_by(user_id=user_id).all()
         tummy_times = TummyTime.query.filter_by(user_id=user_id).all()
@@ -594,11 +785,24 @@ def get_homepage_data(user_id):
             "notes": s.notes
         } for s in sleep])
 
+        # Sort all activities by time
         activities.sort(key=lambda x: x['time'], reverse=True)
+
+        # Get total count before pagination
+        total_count = len(activities)
+
+        # Apply pagination
+        paginated_activities = activities[offset:offset + limit]
+
+        # Check if there are more items
+        has_more = (offset + limit) < total_count
 
         return jsonify({
             "success": True,
-            "activities": activities
+            "activities": paginated_activities,
+            "total": total_count,
+            "page": page,
+            "has_more": has_more
         }), 200
     
     except Exception as e:

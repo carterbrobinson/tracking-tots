@@ -92,10 +92,11 @@ class CommonFormWidgets {
     );
   }
 
-  static Widget buildNotesField(Function(String) onChanged) {
+  static Widget buildNotesField(Function(String) onChanged, {String? initialValue}) {
     return TextFormField(
+      initialValue: initialValue,
       decoration: InputDecoration(
-        hintText: 'Add any additional notes...',
+        hintText: 'Add notes...',
         hintStyle: TextStyle(
           color: Colors.grey[700],
         ),
@@ -146,36 +147,41 @@ class CommonFormWidgets {
   static Widget buildDateTimePicker({
     required DateTime initialDateTime,
     required Function(DateTime) onDateTimeChanged,
+    bool isUpdate = false,
   }) {
     return Container(
       height: 180,
       child: CupertinoDatePicker(
         mode: CupertinoDatePickerMode.dateAndTime,
         initialDateTime: initialDateTime,
-        maximumDate: DateTime.now(),
-        minimumDate: DateTime.now().subtract(Duration(days: 7)),
+        maximumDate: DateTime.now().add(Duration(days: 1)),
+        minimumDate: isUpdate ? null : DateTime.now().subtract(Duration(days: 7)),
         onDateTimeChanged: onDateTimeChanged,
+        use24hFormat: false,
       ),
     );
   }
+
   static Widget buildDateTimePickerForward({
     required DateTime initialDateTime,
     required Function(DateTime) onDateTimeChanged,
     DateTime? minimumDate,
+    bool isUpdate = false,
   }) {
-
     DateTime effectiveInitialDate = initialDateTime;
     if (minimumDate != null && initialDateTime.isBefore(minimumDate)) {
       effectiveInitialDate = minimumDate;
     }
+    
     return Container(
       height: 180,
       child: CupertinoDatePicker(
-        mode: CupertinoDatePickerMode.dateAndTime ,
+        mode: CupertinoDatePickerMode.dateAndTime,
         initialDateTime: effectiveInitialDate,
         maximumDate: effectiveInitialDate.add(Duration(days: 30)),
-        minimumDate: minimumDate,
+        minimumDate: isUpdate ? null : (minimumDate ?? effectiveInitialDate),
         onDateTimeChanged: onDateTimeChanged,
+        use24hFormat: false,
       ),
     );
   }

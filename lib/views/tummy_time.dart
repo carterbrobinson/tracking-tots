@@ -124,6 +124,37 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
     return "$hours:$minutes:$seconds";
   }
 
+  Future<void> _deleteTummyTime(Map<String, dynamic> entry) async {
+    try {
+      final id = entry['id'];
+      if (id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cannot delete: Invalid ID')),
+        );
+        return;
+      }
+
+      final response = await http.delete(
+        Uri.parse('http://127.0.0.1:5001/tummy-time/$id')
+      );
+      
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Tummy Time deleted')),
+        );
+        await _fetchTummyTime();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not delete Tummy Time')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!UserState.isLoggedIn) {
@@ -303,6 +334,10 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
                                               ),
                                           ],
                                         ),
+                                        trailing: IconButton(
+                                          icon: Icon(Icons.delete, color: Colors.red),
+                                          onPressed: () => _deleteTummyTime(entry),
+                                        ),
                                       ),
                                     );
                                   },
@@ -319,4 +354,4 @@ class _TummyTimeFormState extends State<TummyTimeForm> {
       ),
     );
   }
-}   
+}

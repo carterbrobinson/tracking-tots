@@ -57,17 +57,23 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
 
     final response = await http.get(
       Uri.parse('http://127.0.0.1:5001/diaper-change/${UserState.userId}')
-      // Uri.parse('https://tracking-tots.onrender.com/diaper-change/${UserState.userId}')
     );
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       
-      // Sort data by time (newest first)
+      // Sort data by time AND id (newest first)
       data.sort((a, b) {
         final timeA = DateTime.parse(a['time']);
         final timeB = DateTime.parse(b['time']);
-        return timeB.compareTo(timeA); // Reverse order - newest first
+        final timeCompare = timeB.compareTo(timeA); // Primary sort by time (newest first)
+        if (timeCompare != 0) {
+          return timeCompare;
+        }
+        // If times are equal, sort by ID (higher/newer ID first)
+        final idA = int.parse(a['id'].toString());
+        final idB = int.parse(b['id'].toString());
+        return idB.compareTo(idA);
       });
       
       _processData(data);
@@ -75,68 +81,39 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
   }
 
   void _processData(List<dynamic> data) {
-    // Create a fresh list of entries
-    List<Map<String, dynamic>> allEntries = [];
-    
-    // Process each item from the server
-    for (int i = 0; i < data.length; i++) {
-      final item = data[i];
-      final time = DateTime.parse(item['time']);
-      final timestamp = time.millisecondsSinceEpoch;
-      final type = item['type'];
-      final notes = item['notes'] ?? '';
-      
-      // Unique position-based identifier that won't change
-      final uniqueKey = item['id']?.toString() ?? '${timestamp}_${i}';
-      
-      allEntries.add({
-        'uniqueKey': uniqueKey,
-        'timestamp': timestamp,
-        'type': type,
-        'notes': notes,
-        'time': time,
-      });
-    }
-    
-    // Sort the entries by timestamp (newest first)
-    allEntries.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
-    
     setState(() {
-      // Reset everything
       _typeDistribution = {'Wet': 0, 'Dirty': 0, 'Mixed': 0};
       _diaperData = [];
       _spotDataMap = {};
       _spotKeys = [];
       
-      // Process in sorted order
-      for (var entry in allEntries) {
-        final type = entry['type'];
-        final uniqueKey = entry['uniqueKey'];
-        final timestamp = entry['timestamp'];
+      // Process each item from the server (data is already sorted newest first)
+      for (var item in data) {
+        final time = DateTime.parse(item['time']);
+        final timestamp = time.millisecondsSinceEpoch;
+        final type = item['type'];
+        final uniqueKey = item['id']?.toString() ?? '${timestamp}_${DateTime.now().millisecondsSinceEpoch}';
         
-        // Update type distribution
+        // Update all data structures at once
         _typeDistribution[type] = (_typeDistribution[type] ?? 0) + 1;
-        
-        // Store in spotDataMap
-        _spotDataMap[uniqueKey] = {
-          'type': type,
-          'notes': entry['notes'],
-          'timestamp': timestamp,
-        };
-        
-        // Add to chart data using the sorted order
+        // Add to end since data is already sorted newest first
         _diaperData.add(FlSpot(timestamp.toDouble(), 1));
         _spotKeys.add(uniqueKey);
+        _spotDataMap[uniqueKey] = {
+          'type': type,
+          'notes': item['notes'] ?? '',
+          'timestamp': timestamp,
+        };
       }
       
-      _totalChanges = allEntries.length;
-      
-      // Use the oldest entry for average calculation
-      final firstChange = allEntries.isNotEmpty 
-          ? allEntries.reduce((a, b) => a['timestamp'] < b['timestamp'] ? a : b)['time'] 
-          : DateTime.now();
-      final daysDifference = DateTime.now().difference(firstChange).inDays + 1;
-      _averageChangesPerDay = _totalChanges / daysDifference;
+      _totalChanges = data.length;
+      if (_totalChanges > 0) {
+        // Use the last item since it's the oldest
+        final firstChange = DateTime.parse(data.last['time']);
+        _averageChangesPerDay = _totalChanges / (DateTime.now().difference(firstChange).inDays + 1);
+      } else {
+        _averageChangesPerDay = 0;
+      }
     });
   }
 
@@ -385,38 +362,39 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
   Widget _buildDiaperList() {
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: _diaperData.length,
+      itemCount: _spotKeys.length,
       itemBuilder: (context, index) {
-        final spot = _diaperData[index];
+        final uniqueKey = _spotKeys[index];
+        final itemData = _spotDataMap[uniqueKey]!;
+        final date = DateTime.fromMillisecondsSinceEpoch(itemData['timestamp']);
         
-        // Get the corresponding key using the index
-        final uniqueKey = index < _spotKeys.length 
-            ? _spotKeys[index]
-            : '${spot.x.toInt()}_$index'; // Fallback
-        
-        final itemData = _spotDataMap[uniqueKey];
-        
-        // Fallback in case the key is not found
-        if (itemData == null) {
-          return SizedBox.shrink(); // Skip this item
-        }
-        
-        final type = itemData['type'] ?? 'Unknown';
-        final notes = itemData['notes'] ?? '';
-        final timestamp = itemData['timestamp'] ?? spot.x.toInt();
-        final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-        
-        return Card(
-          margin: EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: Icon(
+        return InkWell(
+          onTap: () => _showUpdateDiaperDialog(uniqueKey),
+          child: Card(
+            margin: EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Icon(
               Icons.baby_changing_station, 
-              color: type == 'Wet' ? Colors.blue : 
-                    type == 'Dirty' ? Colors.brown : Colors.purple,
+              color: itemData['type'] == 'Wet' ? Colors.blue : 
+                     itemData['type'] == 'Dirty' ? Colors.brown : Colors.purple,
             ),
-            title: Text(DateFormat('MMMM d, y – h:mm a').format(date)),
-            subtitle: Text(type),
-            trailing: notes.isNotEmpty ? Text(notes) : null,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(DateFormat('MMMM d, y – h:mm a').format(date)),
+                if (itemData['notes']?.isNotEmpty ?? false) 
+                  Text(
+                    itemData['notes'],
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+              ],
+            ),
+            subtitle: Text(itemData['type']),
+            trailing: IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _deleteDiaperChanges(uniqueKey),
+            ),
+          ),
           ),
         );
       },
@@ -505,6 +483,150 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
     );
   }
 
+  void _showUpdateDiaperDialog(String uniqueKey) {
+    final itemData = _spotDataMap[uniqueKey]!;
+    String updatedType = itemData['type'];
+    String updatedNotes = itemData['notes'] ?? '';
+    DateTime updatedTime = DateTime.fromMillisecondsSinceEpoch(itemData['timestamp']);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom
+          ),
+          child: SingleChildScrollView(
+            child: BaseModalSheet(
+              title: 'Update Diaper Change',
+              children: [
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CommonFormWidgets.buildFormCard(
+                        title: 'Time',
+                        child: CommonFormWidgets.buildDateTimePicker(
+                          initialDateTime: updatedTime,
+                          onDateTimeChanged: (newTime) {
+                            updatedTime = newTime;
+                          },
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      CommonFormWidgets.buildFormCard(
+                        title: 'Type',
+                        child: DropdownButtonFormField<String>(
+                          value: updatedType,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          items: ['Wet', 'Dirty', 'Mixed'].map((type) {
+                            return DropdownMenuItem(
+                              value: type,
+                              child: Text(type),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              updatedType = value;
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      CommonFormWidgets.buildFormCard(
+                        title: 'Notes',
+                        child: CommonFormWidgets.buildNotesField(
+                          (value) => updatedNotes = value ?? '',
+                          initialValue: updatedNotes,
+                        ),
+                      ),
+                      SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Expanded(
+                            child: CommonFormWidgets.buildSubmitButton(
+                              text: 'Update',
+                              onPressed: () async {
+                                await _updateDiaperChange(
+                                  uniqueKey,
+                                  updatedType,
+                                  updatedTime,
+                                  updatedNotes,
+                                );
+                                Navigator.pop(context);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteDiaperChanges(String uniqueKey) async {
+    try {
+      final response = await http.delete(Uri.parse('http://127.0.0.1:5001/diaper-change/$uniqueKey'));
+      
+      if (response.statusCode == 200) {
+        setState(() {
+          // Get the index and data of the item being deleted
+          final index = _spotKeys.indexOf(uniqueKey);
+          final itemData = _spotDataMap[uniqueKey]!;
+          final type = itemData['type'];
+          
+          // Update type distribution
+          _typeDistribution[type] = (_typeDistribution[type]! - 1);
+          
+          // Remove from all data structures
+          _spotKeys.removeAt(index);
+          _diaperData.removeAt(index);
+          _spotDataMap.remove(uniqueKey);
+          
+          // Update totals
+          _totalChanges--;
+          
+          // Recalculate average if there are still entries
+          if (_totalChanges > 0) {
+            final oldestTimestamp = _diaperData.last.x.toInt();
+            final firstChange = DateTime.fromMillisecondsSinceEpoch(oldestTimestamp);
+            _averageChangesPerDay = _totalChanges / (DateTime.now().difference(firstChange).inDays + 1);
+          } else {
+            _averageChangesPerDay = 0;
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Diaper change deleted')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not delete diaper change')),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     if (_isSubmitting) return;
 
@@ -543,10 +665,9 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
           SnackBar(content: Text('Diaper added successfully!')),
         );
 
-        // CHANGE: Instead of fetching from server, add the new entry locally
-        _addNewDiaperToList(data);
-
-        // Now dismiss modal
+        // Fetch fresh data from server
+        await _fetchDiaperData();
+        
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -555,6 +676,9 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
       }
     } catch (e) {
       print('Submission error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Could not add diaper change')),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -564,40 +688,32 @@ class _DiaperFormState extends State<DiaperForm> with SingleTickerProviderStateM
     }
   }
 
-  // Add this new method to manually add a diaper change to the list
-  void _addNewDiaperToList(Map<String, dynamic> data) {
-    setState(() {
-      // Create timestamp and unique key
-      final time = DateTime.parse(data['time']);
-      final timestamp = time.millisecondsSinceEpoch;
-      final uniqueKey = 'new_${timestamp}_${DateTime.now().millisecondsSinceEpoch}';
-      final type = data['type'];
-      final notes = data['notes'] ?? '';
-      
-      // Update type distribution
-      _typeDistribution[type] = (_typeDistribution[type] ?? 0) + 1;
-      
-      // Store details in spotDataMap
-      _spotDataMap[uniqueKey] = {
-        'type': type,
-        'notes': notes,
-        'timestamp': timestamp,
-      };
-      
-      // Insert at the beginning of lists (newest first)
-      _diaperData.insert(0, FlSpot(timestamp.toDouble(), 1));
-      _spotKeys.insert(0, uniqueKey);
-      
-      // Update counters
-      _totalChanges += 1;
-      
-      // Recalculate average
-      final oldestTimestamp = _diaperData.isEmpty ? 
-          timestamp : 
-          _diaperData.map((spot) => spot.x.toInt()).reduce((a, b) => a < b ? a : b);
-      final firstChange = DateTime.fromMillisecondsSinceEpoch(oldestTimestamp);
-      final daysDifference = DateTime.now().difference(firstChange).inDays + 1;
-      _averageChangesPerDay = _totalChanges / daysDifference;
-    });
+  Future<void> _updateDiaperChange(String id, String type, DateTime time, String notes) async {
+    try {
+      final response = await http.put(
+        Uri.parse('http://127.0.0.1:5001/diaper-change/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': type,
+          'time': time.toIso8601String(),
+          'notes': notes,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Diaper change updated successfully!')),
+        );
+        await _fetchDiaperData(); // Refresh the data
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating diaper change')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not update diaper change')),
+      );
+    }
   }
 }

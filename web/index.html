@@ -33,19 +33,21 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
   <script>
+    // Register service worker before loading the app
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('firebase-messaging-sw.js')
-        .then(function(registration) {
-          console.log('Service Worker registered: ', registration);
-        }).catch(function(err) {
-          console.log('Service Worker registration failed: ', err);
-        });
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('firebase-messaging-sw.js')
+          .then(function(registration) {
+            console.log('Service Worker registered with scope:', registration.scope);
+            return registration;
+          })
+          .catch(function(err) {
+            console.log('Service Worker registration failed:', err);
+          });
+      });
     }
   </script>
-  
-  
-
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

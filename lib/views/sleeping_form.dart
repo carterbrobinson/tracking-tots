@@ -28,6 +28,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
   double _averageSleepHours = 0;
   double _longestSleep = 0;
   double _duration = 0.0;
+  Map<int, int> _sleepIds = {};
 
   /// Formats DateTime as `YYYY-MM-DD HH:MM:SS`
   String _formatDateTime(DateTime dateTime) {
@@ -54,12 +55,25 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
       final List<dynamic> data = jsonDecode(response.body);
 
       setState(() {
-        _sleepData = data.map((item) {
+        // Clear existing IDs map
+        _sleepIds.clear();
+        
+        // Process each item
+        _sleepData = [];
+        for (int i = 0; i < data.length; i++) {
+          final item = data[i];
           final startTime = DateTime.parse(item['start_time']);
           final endTime = DateTime.parse(item['end_time']);
           final duration = endTime.difference(startTime).inMinutes.toDouble();
-          return FlSpot(startTime.millisecondsSinceEpoch.toDouble(), duration);
-        }).toList();
+          final id = item['id']; // Get the ID
+          
+          // Add to sleep data
+          _sleepData.add(FlSpot(startTime.millisecondsSinceEpoch.toDouble(), duration));
+          
+          // Store ID by index
+          _sleepIds[i] = id;
+        }
+        
         _processData();
       });
     }
@@ -496,7 +510,7 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
             SizedBox(height: 16),
             Container(
               height: 200,
-              child: dates.isNotEmpty
+              child: filteredDailyTotals.isNotEmpty
                   ? BarChart(
                       BarChartData(
                         alignment: BarChartAlignment.spaceAround,
@@ -504,22 +518,24 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
                                 (a, b) => a > b ? a : b) / 60)
                             .ceilToDouble() +
                             1,
-                        barGroups: List.generate(dates.length, (index) {
-                          final date = dates[index];
-                          return BarChartGroupData(
-                            x: index,
-                            barRods: [
-                              BarChartRodData(
-                                toY: (filteredDailyTotals[date] ?? 0) / 60,
-                                width: 20,
-                                color: Color(0xFF6A359C),
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(4),
-                                ),
-                              ),
-                            ],
-                          );
-                        }),
+                        barGroups: filteredDailyTotals.isEmpty 
+                            ? [BarChartGroupData(x: 0, barRods: [])] // Provide default empty group
+                            : List.generate(dates.length, (index) {
+                                final date = dates[index];
+                                return BarChartGroupData(
+                                    x: index,
+                                    barRods: [
+                                        BarChartRodData(
+                                            toY: (filteredDailyTotals[date] ?? 0) / 60,
+                                            width: 20,
+                                            color: Color(0xFF6A359C),
+                                            borderRadius: BorderRadius.vertical(
+                                                top: Radius.circular(4),
+                                            ),
+                                        ),
+                                    ],
+                                );
+                            }),
                         gridData: FlGridData(
                           show: true,
                           drawVerticalLine: false,
@@ -662,40 +678,75 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
         final endTime = date.add(Duration(minutes: duration.toInt()));
 
         final isNap = _isNapTime(date);
+        final id = _sleepIds[index];
         
-        return Card(
-          elevation: 4,
-          margin: EdgeInsets.symmetric(vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Color(0xFF6A359C).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+        return InkWell(
+          onTap: () {
+            if (id != null) {
+              _showUpdateSleepDialog(
+                id: id,
+                startTime: startTime,
+                endTime: endTime,
+                notes: _notes ?? '',
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cannot update: Invalid session ID')),
+              );
+            }
+          },
+          child: Card(
+            elevation: 4,
+            margin: EdgeInsets.symmetric(vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Color(0xFF6A359C).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(isNap ? Icons.wb_sunny : Icons.bedtime, color: Color(0xFF6A359C)),
               ),
-              child: Icon(isNap ? Icons.wb_sunny : Icons.bedtime, color: Color(0xFF6A359C)),
-            ),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  DateFormat('EEEE, MMMM d').format(_startTime),
-                  style: TextStyle(color: Colors.black),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    DateFormat('EEEE, MMMM d').format(startTime),
+                    style: TextStyle(color: Colors.black),
+                  ),
+                  Text(
+                    '${DateFormat('hh:mm a').format(startTime)} - ${DateFormat('hh:mm a').format(endTime)}',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                duration > 0 && (duration ~/ 60) > 0
+                ? '${(duration ~/ 60)} hours ${duration % 60} minutes'
+                : '${(duration % 60)} minutes'  
+              ),
+              trailing: SizedBox(
+                width: 96,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red), 
+                      onPressed: () {
+                        if (id != null) {
+                          _deleteSleeping(id);
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.chevron_right), 
+                      onPressed: () => _showSleepDetails(date, duration),
+                    ),
+                  ],
                 ),
-                Text(
-                  '${DateFormat('hh:mm a').format(startTime)} - ${DateFormat('hh:mm a').format(endTime)}',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
+              ),
             ),
-            subtitle: Text(
-              duration > 0 && (duration ~/ 60) > 0
-              ? '${(duration ~/ 60)} hours ${duration % 60} minutes'
-              : '${(duration % 60)} minutes'  
-            ),
-            trailing: Icon(Icons.chevron_right),
-            onTap: () => _showSleepDetails(date, duration),
           ),
         );
       },
@@ -849,6 +900,141 @@ class _SleepingFormState extends State<SleepingForm> with SingleTickerProviderSt
         ],
       ),
     );
+  }
+
+  void _showUpdateSleepDialog({
+    required int id,
+    required DateTime startTime,
+    required DateTime endTime,
+    required String notes,
+  }) {
+    // Create local variables for the form
+    DateTime _updatedStartTime = startTime;
+    DateTime _updatedEndTime = endTime;
+    String _updatedNotes = notes;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => BaseModalSheet(
+        title: 'Update Sleep Session',
+        children: [
+          Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                CommonFormWidgets.buildFormCard(
+                  title: 'Start Time',
+                  child: CommonFormWidgets.buildDateTimePicker(
+                    initialDateTime: _updatedStartTime,
+                    onDateTimeChanged: (newTime) => _updatedStartTime = newTime,
+                    isUpdate: true,
+                  ),
+                ),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'End Time',
+                  child: CommonFormWidgets.buildDateTimePicker(
+                    initialDateTime: _updatedEndTime,
+                    onDateTimeChanged: (newTime) => _updatedEndTime = newTime,
+                    isUpdate: true,
+                  ),
+                ),
+                SizedBox(height: 16),
+                CommonFormWidgets.buildFormCard(
+                  title: 'Notes',
+                  child: CommonFormWidgets.buildNotesField(
+                    (value) => _updatedNotes = value,
+                    initialValue: notes,
+                  ),
+                ),
+                SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    CommonFormWidgets.buildSubmitButton(
+                      text: 'Update Session',
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          if (_updatedEndTime.isBefore(_updatedStartTime)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('End time must be after start time'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          _updateSleeping(id, _updatedStartTime, _updatedEndTime, _updatedNotes);
+                          Navigator.pop(context);
+                        }
+                      }
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteSleeping(int id) async {
+    try {
+      final response = await http.delete(Uri.parse('http://127.0.0.1:5001/sleeping/$id'));
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sleeping session deleted')),
+        );
+        await _fetchSleepData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not delete sleeping session')),
+      );
+    }
+  }
+
+  Future<void> _updateSleeping(
+    int id,
+    DateTime startTime,
+    DateTime endTime,
+    String notes,
+  ) async {
+    final data = {
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
+      'notes': notes,
+    };
+
+    try {
+      final response = await http.put(
+        Uri.parse('http://127.0.0.1:5001/sleeping/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sleep session updated successfully!')),
+        );
+        await _fetchSleepData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating sleep session.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not update sleep session.')),
+      );
+    }
   }
 
   Future<void> _submit() async {

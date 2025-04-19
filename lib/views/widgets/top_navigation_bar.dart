@@ -91,7 +91,7 @@ class TopNavigationBar extends StatelessWidget implements PreferredSizeWidget {
                                 value: 'diaper',
                                 child: ListTile(
                                     leading: Icon(Icons.baby_changing_station, color: Color(0xFF6A359C)),
-                                    title: Text('Diaper'),
+                                    title: Text('Diaper Change'),
                                 ),
                             ),
                             PopupMenuItem(

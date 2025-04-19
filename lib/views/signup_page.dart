@@ -87,7 +87,18 @@ class _SignupPageState extends State<SignupPage> {
             ),
           ),
           child: AppBar(
-            title: const Text("Sign up"),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  "assets/tracking-tots-white.png",
+                  width: 40,
+                  height: 40,
+                ),
+                const SizedBox(width: 10),
+                const Text("Signup"),
+              ],
+            ),
             backgroundColor: Colors.transparent,
             automaticallyImplyLeading: false,
           ),

@@ -31,7 +31,18 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           child: AppBar(
-            title: const Text("Login"),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  "assets/tracking-tots-white.png",
+                  width: 40,
+                  height: 40,
+                ),
+                const SizedBox(width: 10),
+                const Text("Login"),
+              ],
+            ),
             backgroundColor: Colors.transparent,
             automaticallyImplyLeading: false,
           ),

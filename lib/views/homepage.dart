@@ -12,6 +12,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _activities = [];
   bool _isLoading = true;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  int _page = 1;
+  int _itemsPerPage = 10;
 
   @override
   void initState() {
@@ -21,7 +25,40 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _fetchActivities() async {
+  // Future<void> _fetchActivities() async {
+  //   if (UserState.userId == null) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Please log in to view your activities.'))
+  //       );
+  //       Navigator.pushReplacementNamed(context, '/login');
+  //     }
+  //     return;
+  //   }
+
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse('http://127.0.0.1:5001/homepage/${UserState.userId}')
+  //     );
+
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       if (mounted) {
+  //         setState(() {
+  //           _activities = List<Map<String, dynamic>>.from(data['activities']);
+  //           _isLoading = false;
+  //         });
+  //       }
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error loading activities: $e'))
+  //       );
+  //     }
+  //   }
+  // }
+  Future<void> _fetchActivities({bool loadMore = false}) async {
     if (UserState.userId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -32,17 +69,27 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    if (!loadMore) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final response = await http.get(
-        Uri.parse('http://127.0.0.1:5001/homepage/${UserState.userId}')
+        Uri.parse('http://127.0.0.1:5001/homepage/${UserState.userId}?page=$_page&limit=$_itemsPerPage')
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (mounted) {
           setState(() {
-            _activities = List<Map<String, dynamic>>.from(data['activities']);
+            if (loadMore) {
+              _activities.addAll(List<Map<String, dynamic>>.from(data['activities']));
+            } else {
+              _activities = List<Map<String, dynamic>>.from(data['activities']);
+            }
+            _hasMore = data['has_more']; // Add this line
             _isLoading = false;
+            _loadingMore = false;
           });
         }
       }
@@ -52,6 +99,16 @@ class _HomePageState extends State<HomePage> {
           SnackBar(content: Text('Error loading activities: $e'))
         );
       }
+    }
+  }
+
+  void _loadMore() {
+    if (!_loadingMore && _hasMore) {
+      setState(() {
+        _loadingMore = true;
+        _page++;
+      });
+      _fetchActivities(loadMore: true);
     }
   }
 
@@ -216,13 +273,37 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   Container(
-                    height: MediaQuery.of(context).size.height * 0.5,
                     child: ListView.builder(
                       shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      itemCount: _activities.length,
+                      physics: AlwaysScrollableScrollPhysics(),
+                      itemCount: _activities.length + (_hasMore ? 1 : 0),
                       padding: EdgeInsets.all(16),
                       itemBuilder: (context, index) {
+                        if (index == _activities.length) {
+                          if (_loadingMore) {
+                            return Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          } else if (_hasMore) {
+                            return Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: TextButton(
+                                  onPressed: _loadMore,
+                                  child: Text('See More'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Color(0xFF6A359C),
+                                  ),
+                                ),
+                              ),
+                            );
+                          } else {
+                            return SizedBox.shrink();
+                          }
+                        }
                         final activity = _activities[index];
                         return Card(
                           margin: EdgeInsets.only(bottom: 8),

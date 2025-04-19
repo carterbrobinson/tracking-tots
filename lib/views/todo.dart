@@ -8,6 +8,7 @@ import 'package:trackingtots/views/widgets/form_builder.dart';
 import 'package:trackingtots/views/widgets/modal_sheet.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:trackingtots/config.dart';
 
 class TodoForm extends StatefulWidget {
   @override
@@ -23,7 +24,7 @@ class _TodoFormState extends State<TodoForm> {
   int _completedTasks = 0;
   int _pendingTasks = 0;
   DateTime? _reminderTime;
-  int _selectedReminderOffsetIndex = 1;
+  int _selectedReminderOffsetIndex = 0;
   final List<int> _reminderOffsets = [0, 10, 20, 30, 60];
   final List<String> _reminderOptions = [
     "At time of task",
@@ -33,11 +34,15 @@ class _TodoFormState extends State<TodoForm> {
     "1 hour before",
   ];
   bool _isSettingReminder = false;
+  DateTime _updatedTime = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _fetchTodos();
+    // Set default reminder to "At time of task"
+    _selectedReminderOffsetIndex = 0;
+    _reminderTime = _time;
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
@@ -92,8 +97,7 @@ class _TodoFormState extends State<TodoForm> {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
-    // final response = await http.get(Uri.parse('https://tracking-tots.onrender.com/todo/${UserState.userId}'));
-    final response = await http.get(Uri.parse('http://127.0.0.1:5001/todo/${UserState.userId}'));
+    final response = await http.get(Uri.parse(Config.todoEndpoint(UserState.userId!)));
     print('Fetch Response: ${response.body}');
     if (response.statusCode == 200) {
       setState(() {
@@ -108,10 +112,12 @@ class _TodoFormState extends State<TodoForm> {
     final today = DateTime(now.year, now.month, now.day);
 
     _todayTasks = _todos.where((todo) {
-      final todoDate = DateTime.parse(todo['time']);
-      return todoDate.year == today.year &&
-             todoDate.month == today.month &&
-             todoDate.day == today.day;
+      final utcTime = DateTime.parse(todo['time']);
+      final localTime = utcTime.toLocal();
+      print('Debug - UTC Time: ${utcTime}, Local Time: ${localTime}');
+      return localTime.year == today.year &&
+             localTime.month == today.month &&
+             localTime.day == today.day;
     }).length;
 
     _completedTasks = _todos.where((todo) => todo['completed'] == true).length;
@@ -155,112 +161,160 @@ class _TodoFormState extends State<TodoForm> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => BaseModalSheet(
-        title: 'Add To-Do',
-        children: [
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                CommonFormWidgets.buildFormCard(
-                  title: 'Due Date & Time',
-                  child: CommonFormWidgets.buildDateTimePickerForward(
-                    initialDateTime: _time,
-                    minimumDate: DateTime.now(),
-                    onDateTimeChanged: (newTime) {
-                      setState(() {
-                        _time = newTime;
-                        _reminderTime = _time.subtract(Duration(minutes: _reminderOffsets[_selectedReminderOffsetIndex]));
-                      });
-                    },
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => BaseModalSheet(
+          title: 'Add To-Do',
+          children: [
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Due Date & Time',
+                    child: CommonFormWidgets.buildDateTimePickerForward(
+                      initialDateTime: _time,
+                      minimumDate: DateTime.now().add(Duration(minutes: 1)),
+                      onDateTimeChanged: (newTime) {
+                        setModalState(() {
+                          _time = newTime;
+                          _reminderTime = _time.subtract(Duration(minutes: _reminderOffsets[_selectedReminderOffsetIndex]));
+                        });
+                      },
+                    ),
                   ),
-                ),
-                SizedBox(height: 16),
-                CommonFormWidgets.buildFormCard(
-                  title: 'Task Description',
-                  child: TextFormField(
-                    decoration: InputDecoration(
-                      hintText: 'Enter your task',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Task Description',
+                    child: TextFormField(
+                      decoration: InputDecoration(
+                        hintText: 'Enter your task',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      maxLines: 3,
+                      onChanged: (value) => _notes = value,
+                      validator: (value) => value == null || value.isEmpty ? 'Enter a task description' : null,
                     ),
-                    maxLines: 3,
-                    onChanged: (value) => _notes = value,
-                    validator: (value) => value == null || value.isEmpty ? 'Enter a task description' : null,
                   ),
-                ),
-                ElevatedButton(
-                  onPressed: _showReminderOffsetPicker,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _reminderTime != null ? Colors.deepPurple : Colors.grey[200],
-                    foregroundColor: _reminderTime != null ? Colors.white : Colors.grey[800],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_reminderTime != null ? Icons.notifications_active : Icons.notifications_none),
-                      SizedBox(width: 8),
-                      Text(_reminderTime != null ? 'Reminder Set' : 'Set Reminder'),
-                    ],
-                  ),
-                ),
-                if (_reminderTime != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Reminder Settings',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Reminder: ${_reminderOptions[_selectedReminderOffsetIndex]}',
-                          style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Icon(Icons.notifications, color: Color(0xFF6A359C)),
+                            SizedBox(width: 8),
+                            Text(
+                              'Set Reminder',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF6A359C),
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          '(${DateFormat('EEE, MMM d - h:mm a').format(_reminderTime!)})',
-                          style: TextStyle(color: Colors.deepPurple),
+                        SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _reminderOffsets.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final minutes = entry.value;
+                            final isSelected = _selectedReminderOffsetIndex == index;
+                            final reminderTime = _time.subtract(Duration(minutes: minutes));
+                            // Only check for past times if it's not "At time of task" (index 0)
+                            final isPast = index > 0 && reminderTime.isBefore(DateTime.now());
+                            
+                            return ChoiceChip(
+                              label: Text(_reminderOptions[index]),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                if (selected && (index == 0 || !isPast)) {
+                                  setModalState(() {
+                                    _selectedReminderOffsetIndex = index;
+                                    _reminderTime = reminderTime;
+                                  });
+                                } else if (isPast) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Cannot set reminder in the past'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                              selectedColor: Color(0xFF6A359C),
+                              backgroundColor: isPast ? Colors.grey[300] : Colors.grey[200],
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : (isPast ? Colors.grey[500] : Colors.black),
+                              ),
+                            );
+                          }).toList(),
                         ),
+                        if (_reminderTime != null) ...[
+                          SizedBox(height: 16),
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF6A359C).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.access_time, color: Color(0xFF6A359C)),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Reminder will be sent at:',
+                                  style: TextStyle(color: Color(0xFF6A359C)),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  DateFormat('h:mm a').format(_reminderTime!),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF6A359C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ElevatedButton(
-                  onPressed: () {
-                    // Set reminder to 30 seconds from now
-                    setState(() {
-                      _time = DateTime.now().add(Duration(minutes: 2));
-                      _reminderTime = DateTime.now().add(Duration(seconds: 30));
-                      _selectedReminderOffsetIndex = 0; // "At time of task"
-                    });
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Reminder set to 30 seconds from now"))
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text("Set Test Reminder (30s)"),
-                ),
-                SizedBox(height: 24),
-                CommonFormWidgets.buildSubmitButton(
-                  text: 'Save Task',
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      _submit();
-                      Navigator.pop(context);
+                  SizedBox(height: 24),
+                  CommonFormWidgets.buildSubmitButton(
+                    text: 'Save Task',
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        // Only validate reminder time if it's not "At time of task"
+                        if (_reminderTime != null && 
+                            _selectedReminderOffsetIndex > 0 && 
+                            _reminderTime!.isBefore(DateTime.now())) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Cannot set reminder in the past'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+                        _submit();
+                        Navigator.pop(context);
+                      }
                     }
-                  }
-                )
-              ]
-            )
-          )
-        ]
-      )
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -287,7 +341,7 @@ class _TodoFormState extends State<TodoForm> {
 
       try {
         final response = await http.post(
-          Uri.parse('http://127.0.0.1:5001/todo/${UserState.userId}'),
+          Uri.parse(Config.todoEndpoint(UserState.userId!)),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(data),
         );
@@ -317,7 +371,7 @@ class _TodoFormState extends State<TodoForm> {
           _notes = '';
           _fetchTodos();
           _reminderTime = null;
-          _selectedReminderOffsetIndex = 1;
+          _selectedReminderOffsetIndex = 0;
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error adding Todo: ${response.statusCode}')),
@@ -337,7 +391,7 @@ class _TodoFormState extends State<TodoForm> {
   Future<void> _testReminderNotification() async {
     try {
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:5001/test-reminders/${UserState.userId}'),
+        Uri.parse(Config.testRemindersEndpoint(UserState.userId!)),
         headers: {'Content-Type': 'application/json'},
       );
       
@@ -353,8 +407,7 @@ class _TodoFormState extends State<TodoForm> {
 
   Future<void> _deleteTodos(int id) async {
     try {
-      final response = await http.delete(Uri.parse('http://127.0.0.1:5001/todo/$id'));
-      // final response = await http.delete(Uri.parse('https://tracking-tots.onrender.com/todo/$id'));
+      final response = await http.delete(Uri.parse(Config.todoEndpoint(id)));
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Todo deleted')),
@@ -375,8 +428,7 @@ class _TodoFormState extends State<TodoForm> {
   Future<void> _toggleTodoStatus(int id) async {
     try {
       final response = await http.patch(
-        Uri.parse('http://127.0.0.1:5001/todo/$id/toggle'),
-        // Uri.parse('https://tracking-tots.onrender.com/todo/$id/toggle'),
+        Uri.parse(Config.todoToggleEndpoint(id)),
         headers: {'Content-Type': 'application/json'},
       );
       print('Toggle Response: ${response.body}');
@@ -401,9 +453,12 @@ class _TodoFormState extends State<TodoForm> {
       return SizedBox.shrink();
     }
     
-    final reminderTime = DateTime.parse(todo['reminder_time']);
+    final utcTime = DateTime.parse(todo['reminder_time']);
+    final reminderTime = utcTime.toLocal();
     final now = DateTime.now();
     final difference = reminderTime.difference(now);
+    
+    print('Debug - Reminder UTC: ${utcTime}, Local: ${reminderTime}');
     
     // For reminders in the past or very soon
     if (difference.inMinutes <= 5) {
@@ -469,7 +524,9 @@ class _TodoFormState extends State<TodoForm> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final todo = _todos[index];
-                      final todoDate = DateTime.parse(todo['time']);
+                      final utcTime = DateTime.parse(todo['time']);
+                      final todoDate = utcTime.toLocal();
+                      print('Debug - Todo UTC: ${utcTime}, Local: ${todoDate}');
                       return Card(
                         elevation: 4,
                         margin: EdgeInsets.symmetric(vertical: 8),
@@ -564,7 +621,7 @@ class _TodoFormState extends State<TodoForm> {
                 
                 try {
                   final response = await http.post(
-                    Uri.parse('http://127.0.0.1:5001/test-user-notification/${UserState.userId}'),
+                    Uri.parse(Config.testRemindersEndpoint(UserState.userId!)),
                     headers: {'Content-Type': 'application/json'},
                   );
                   

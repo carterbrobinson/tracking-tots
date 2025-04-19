@@ -515,10 +515,12 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
           final totalDuration = leftDuration + rightDuration;
           final endTime = time.add(Duration(minutes: totalDuration));
           
-          return Card(
-            margin: EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: Icon(
+          return InkWell(
+            onTap: () => _showUpdateFeedingDialog(item['id']),
+            child: Card(
+              margin: EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Icon(
                 feedingType == 'Bottle' ? Icons.baby_changing_station : Icons.child_care,
                 color: Color(0xFF6A359C)
               ),
@@ -529,8 +531,22 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
                   Text('${DateFormat('hh:mm a').format(time)} - ${DateFormat('hh:mm a').format(endTime)}'),
                 ],
               ),
-              trailing: Text('$feedingType - $trailingText'),
-            ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      '$feedingType - $trailingText',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteFeedings(item['id']),
+                  ),
+                ],
+              ),
+            ),)
           );
         } catch (e) {
           // Return a fallback card for invalid data
@@ -720,6 +736,225 @@ class _FeedingFormState extends State<FeedingForm> with SingleTickerProviderStat
         ),
       ),
     );
+  }
+
+  void _showUpdateFeedingDialog(int id) {
+    // Find the existing feeding data
+    final feedingData = _feedingDetails.firstWhere((item) => item['id'] == id);
+    
+    // Create local variables for the form
+    String localType = feedingData['type'] ?? 'Breast';
+    DateTime localStartTime = DateTime.parse(feedingData['start_time']);
+    DateTime localEndTime = DateTime.parse(feedingData['end_time']);
+    int? localLeftDuration = feedingData['left_breast_duration'];
+    int? localRightDuration = feedingData['right_breast_duration'];
+    int? localBottleAmount = feedingData['bottle_amount'];
+    String? localNotes = feedingData['notes'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => BaseModalSheet(
+          title: 'Update Feeding',
+          children: [
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Start Time',
+                    child: CommonFormWidgets.buildDateTimePicker(
+                      initialDateTime: localStartTime,
+                      onDateTimeChanged: (newTime) => setModalState(() => localStartTime = newTime),
+                      isUpdate: true,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'End Time',
+                    child: CommonFormWidgets.buildDateTimePicker(
+                      initialDateTime: localEndTime,
+                      onDateTimeChanged: (newTime) => setModalState(() => localEndTime = newTime),
+                      isUpdate: true,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Type',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => setModalState(() => localType = 'Breast'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: localType == 'Breast' ? Color(0xFF6A359C) : Colors.grey[200],
+                              foregroundColor: localType == 'Breast' ? Colors.white : Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.horizontal(left: Radius.circular(8)),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: Text('Breast'),
+                          ),
+                        ),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => setModalState(() => localType = 'Bottle'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: localType == 'Bottle' ? Color(0xFF6A359C) : Colors.grey[200],
+                              foregroundColor: localType == 'Bottle' ? Colors.white : Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.horizontal(right: Radius.circular(8)),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: Text('Bottle'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (localType == 'Breast') ...[
+                    SizedBox(height: 16),
+                    CommonFormWidgets.buildFormCard(
+                      title: 'Left Breast Duration (minutes)',
+                      child: TextFormField(
+                        initialValue: localLeftDuration?.toString() ?? '',
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) => localLeftDuration = int.tryParse(value),
+                        validator: (value) => value?.isEmpty ?? true ? 'Please enter a duration' : null,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    CommonFormWidgets.buildFormCard(
+                      title: 'Right Breast Duration (minutes)',
+                      child: TextFormField(
+                        initialValue: localRightDuration?.toString() ?? '',
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) => localRightDuration = int.tryParse(value),
+                        validator: (value) => value?.isEmpty ?? true ? 'Please enter a duration' : null,
+                      ),
+                    ),
+                  ] else
+                    CommonFormWidgets.buildFormCard(
+                      title: 'Bottle Amount (ml)',
+                      child: TextFormField(
+                        initialValue: localBottleAmount?.toString() ?? '',
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) => localBottleAmount = int.tryParse(value),
+                        validator: (value) => value?.isEmpty ?? true ? 'Please enter an amount' : null,
+                      ),
+                    ),
+                  SizedBox(height: 16),
+                  CommonFormWidgets.buildFormCard(
+                    title: 'Notes',
+                    child: CommonFormWidgets.buildNotesField(
+                      (value) => localNotes = value,
+                      initialValue: localNotes,
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  CommonFormWidgets.buildSubmitButton(
+                    text: 'Update Feeding',
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        _updateFeeding(
+                          id.toString(),
+                          localType,
+                          localStartTime,
+                          localEndTime,
+                          localLeftDuration,
+                          localRightDuration,
+                          localBottleAmount,
+                          localNotes ?? '',
+                        );
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                  SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteFeedings(int id) async {
+    try {
+      final response = await http.delete(Uri.parse('http://127.0.0.1:5001/feeding/$id'));
+      // final response = await http.delete(Uri.parse('https://tracking-tots.onrender.com/todo/$id'));
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Feeding deleted')),
+        );
+        await _fetchFeedingData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not delete feeding')),
+      );
+    }
+  }
+
+  Future<void> _updateFeeding(
+    String id,
+    String type,
+    DateTime startTime,
+    DateTime endTime,
+    int? leftDuration,
+    int? rightDuration,
+    int? bottleAmount,
+    String notes,
+  ) async {
+    try {
+      final response = await http.put(
+        Uri.parse('http://127.0.0.1:5001/feeding/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': UserState.userId,
+          'type': type,
+          'left_breast_duration': leftDuration,
+          'right_breast_duration': rightDuration,
+          'bottle_amount': bottleAmount,
+          'start_time': startTime.toIso8601String(),
+          'end_time': endTime.toIso8601String(),
+          'notes': notes,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Feeding updated successfully!')),
+        );
+        await _fetchFeedingData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating feeding')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: Could not update feeding')),
+      );
+    }
   }
 
   Future<void> _submit() async {
